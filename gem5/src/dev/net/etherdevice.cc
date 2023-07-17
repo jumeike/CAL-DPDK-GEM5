@@ -35,6 +35,18 @@ namespace gem5
 
 EtherDevice::EtherDeviceStats::EtherDeviceStats(statistics::Group *parent)
     : statistics::Group(parent, "EtherDevice"),
+      ADD_STAT(dmaDrops, statistics::units::Count::get(),
+               "Number of packet drops due to DMA/rxFifo bottleneck"),
+      ADD_STAT(coreDrops, statistics::units::Count::get(),
+               "Number of packet drops due to Core bottleneck"),
+      ADD_STAT(txDrops, statistics::units::Count::get(),
+               "Number of packet drops due to TX Ring Buffer bottleneck"),
+      ADD_STAT(unknownDrops, statistics::units::Count::get(),
+               "Number of packet drops due to either dma, core, or tx bottleneck"),
+      ADD_STAT(rxRingBufferFull, statistics::units::Count::get(),
+               "Number of times the rxRingBuffer fills up"),
+      ADD_STAT(txRingBufferFull, statistics::units::Count::get(),
+               "Number of times the txRingBuffer fills up"),
       ADD_STAT(postedInterrupts, statistics::units::Count::get(),
                "Number of posts to CPU"),
       ADD_STAT(txBytes, statistics::units::Byte::get(),

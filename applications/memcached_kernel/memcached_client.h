@@ -13,12 +13,21 @@
 #include <string>
 #include <thread>
 
+#ifdef _USE_DPDK_CLIENT_
+#include <dpdk.h>
+static constexpr uint16_t kMaxBatchSize = kMaxBurstSize;
+#else
+static constexpr uint16_t kMaxBatchSize = 128;
+#endif
+
+#include <helpers.h>
+
 static constexpr size_t kClSize = 64;
 static constexpr size_t kMaxPacketSize = 1500;
-static constexpr size_t kSockTimeout = 1;  // sec.
+static constexpr size_t kSockTimeout = 1; // sec.
 
 class MemcachedClient {
- public:
+public:
   enum Status {
     kOK = 0x0,
     kKeyNotFound = 0x1,
@@ -32,32 +41,51 @@ class MemcachedClient {
     kOtherError = 0xff
   };
 
-  enum DispatchMode { kBlocking = 0x0, kNonBlocking = 0x1 };
-
-  MemcachedClient(const std::string &server_hostname, uint16_t port)
-      : serverHostname(server_hostname),
-        port(port),
-        sock(-1),
-        dispatchMode(DispatchMode::kBlocking),
-        tx_buff(nullptr),
-        rx_buff(nullptr),
-        runRecvThread(false) {}
+#ifdef _USE_DPDK_CLIENT_
+  // Constructor for DPDK networking.
+  MemcachedClient(const std::string &server_mac_addr, uint16_t batch_size)
+      : serverMacAddrStr(server_mac_addr), batchSize(batch_size),
+        currentBatch(0) {}
+#else
+  // Constructor for Kernel networking.
+  MemcachedClient(const std::string &server_hostname, uint16_t port,
+                  uint16_t batch_size)
+      : serverHostname(server_hostname), port(port), sock(-1),
+        batchSize(batch_size), currentBatch(0) {}
+#endif
 
   ~MemcachedClient() {
-    if (dispatchMode == DispatchMode::kNonBlocking) {
-      if (runRecvThread) {
-        runRecvThread = false;
-        recvThread.join();
-      }
-    }
-
-    if (sock != -1) close(sock);
-    if (tx_buff != nullptr) std::free(tx_buff);
-    if (rx_buff != nullptr) std::free(rx_buff);
+#ifndef _USE_DPDK_CLIENT_
+    if (sock != -1)
+      close(sock);
+    for (auto &b : rx_buff)
+      std::free(b.second);
+    for (auto &b : tx_buff)
+      std::free(b.second);
+#endif
   }
 
   int Init() {
+    if (batchSize > kMaxBatchSize) {
+      std::cerr << "The batching size of " << batchSize << " is too large.\n";
+      return -1;
+    }
     // Init networking.
+#ifdef _USE_DPDK_CLIENT_
+    std::cout << "Initializing Kernel-bypass (DPDK) networking" << std::endl;
+    int ret = rte_ether_unformat_addr(serverMacAddrStr.c_str(), &serverMacAddr);
+    if (ret) {
+      std::cerr << "Wrong server MAC address format." << std::endl;
+      return -1;
+    }
+
+    ret = InitDPDK(&dpdkObj);
+    if (ret) {
+      std::cerr << "Failed to initialize network!" << std::endl;
+      return -1;
+    }
+#else
+    std::cout << "Initializing Kernel (socket) networking" << std::endl;
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(port);
     if (inet_pton(AF_INET, serverHostname.c_str(), &(serverAddress.sin_addr)) <=
@@ -75,352 +103,324 @@ class MemcachedClient {
     }
 
     // Set recv. timeout on sock.
-    struct timeval tv = {.tv_sec = kSockTimeout, .tv_usec = 0};
+    struct timeval tv;
+    tv.tv_sec = kSockTimeout;
+    tv.tv_usec = 0;
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
       std::cerr << "Faile to set socket timeout." << std::endl;
       return -1;
     }
 
     // Init buffers.
-    tx_buff =
-        static_cast<uint8_t *>(std::aligned_alloc(kClSize, kMaxPacketSize));
-    assert(tx_buff != nullptr);
+    for (uint16_t i = 0; i < batchSize; ++i) {
+      uint8_t *tx_buff_ =
+          static_cast<uint8_t *>(std::aligned_alloc(kClSize, kMaxPacketSize));
+      assert(tx_buff_ != nullptr);
+      tx_buff.push_back(std::make_pair(0, tx_buff_));
 
-    rx_buff =
-        static_cast<uint8_t *>(std::aligned_alloc(kClSize, kMaxPacketSize));
-    assert(rx_buff != nullptr);
+      uint8_t *rx_buff_ =
+          static_cast<uint8_t *>(std::aligned_alloc(kClSize, kMaxPacketSize));
+      assert(rx_buff_ != nullptr);
+      rx_buff.push_back(std::make_pair(0, rx_buff_));
+    }
+#endif
 
     return 0;
   }
 
-  // Set dispatch mode: if going from blocking (default) to non-blocking,
-  // spin-up recv thread; if going from non-blocking to blocking, stop it.
-  void setDispatchMode(DispatchMode dispatch_mode) {
-    if (dispatchMode == DispatchMode::kBlocking &&
-        dispatch_mode == DispatchMode::kNonBlocking) {
-      zeroOutRecvStat();
-      dispatchMode = DispatchMode::kNonBlocking;
-      runRecvThread = true;
-      recvThread = std::move(std::thread(&MemcachedClient::recvCallback, this));
-      std::cout << "Dispatch mode changed: bloking -> non-blocking\n";
-      return;
-    }
-
-    if (dispatchMode == DispatchMode::kNonBlocking &&
-        dispatch_mode == DispatchMode::kBlocking) {
-      if (runRecvThread) {
-        runRecvThread = false;
-        recvThread.join();
-      }
-      dispatchMode = DispatchMode::kBlocking;
-      std::cout << "Dispatch mode changed: non-bloking -> blocking\n";
-      return;
-    }
-  }
-
-  int set(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
+  int Set(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
           uint16_t key_len, const uint8_t *val, uint32_t val_len) {
-    uint32_t len = 0;
-    int res =
-        form_set(request_id, sequence_n, key, key_len, val, val_len, &len);
-    if (res != 0) return res;
+    // std::cout << "SET: \n";
+    // for (int i=0; i<key_len; ++i)
+    //   std::cout << (int)(*(key + i)) << " ";
+    // std::cout << "  |  ";
+    // for (int i=0; i<val_len; ++i)
+    //   std::cout << (int)(*(val + i)) << " ";
+    // std::cout << "\n";
 
-    res = send(len);
-    if (res != 0) return res;
+    int res = BatchOrAllocate();
+    if (res)
+      return res;
 
-    if (dispatchMode == DispatchMode::kBlocking) {
-      uint16_t req_id_rcv;
-      uint16_t seq_n_recv;
-      recv();
-      int ret = parse_set_response(&req_id_rcv, &seq_n_recv);
-      if (ret != kOK)  // || req_id_rcv != request_id)
-        return -1;
-      else
-        return 0;
+    res = FormSet(request_id, sequence_n, key, key_len, val, val_len);
+    if (res)
+      return res;
+
+    return BatchOrSend();
+  }
+
+  int Get(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
+          uint16_t key_len) {
+    int res = BatchOrAllocate();
+    if (res)
+      return res;
+
+    res = FormGet(request_id, sequence_n, key, key_len);
+    if (res)
+      return res;
+
+    return BatchOrSend();
+  }
+
+  // Receive a batch of responses;
+  // Returns statuses for each SET and data for each GET in
+  // combination with the request_id.
+  void RecvResponses(
+      std::vector<std::pair<uint16_t, Status>> *set_statuses,
+      std::vector<std::pair<uint16_t, std::vector<uint8_t>>> *get_data) {
+    uint16_t total_recv_n = 0;
+
+    while (total_recv_n < batchSize) {
+      // Parse responses.
+      uint16_t recv_n = static_cast<uint16_t>(Recv());
+      for (uint16_t i = 0; i < recv_n; ++i) {
+#ifdef _USE_DPDK_CLIENT_
+        rte_mbuf *mbuf = GetNextDPDKRxBuffer(&dpdkObj);
+        assert(mbuf != nullptr);
+        uint8_t *rx_buff_ptr = ExtractPacketPayload(mbuf);
+#else
+        assert(recv_n == batchSize);
+        uint8_t *rx_buff_ptr = rx_buff[recv_n - 1].second;
+#endif
+
+        uint16_t request_id, sequence_n;
+        size_t h_size = HelperParseUdpHeader(
+            reinterpret_cast<const MemcacheUdpHeader *>(rx_buff_ptr),
+            &request_id, &sequence_n);
+        rx_buff_ptr += h_size;
+
+        const RespHdr *rsp_hdr = reinterpret_cast<const RespHdr *>(rx_buff_ptr);
+        if (rsp_hdr->magic != 0x81) {
+          std::cerr << "Wrong response received: "
+                    << static_cast<int>(rsp_hdr->magic) << "\n";
+          continue;
+        }
+
+        Status status =
+            static_cast<Status>(rsp_hdr->status[1] | (rsp_hdr->status[0] << 8));
+
+        if (rsp_hdr->opcode == 0x01) {
+          // SET.
+          set_statuses->push_back(std::make_pair(request_id, status));
+        } else if (rsp_hdr->opcode == 0x00) {
+          // GET.
+          get_data->push_back(
+              std::make_pair(request_id, std::vector<uint8_t>()));
+          if (status == Status::kOK) {
+            uint32_t val_len;
+            size_t rh_size = HelperParseRspHeader(rsp_hdr, &val_len);
+            rx_buff_ptr += rh_size;
+
+            get_data->back().second.resize(val_len);
+            std::memcpy(get_data->back().second.data(), rx_buff_ptr, val_len);
+          }
+        } else {
+          // Weird opcode.
+          std::cerr << "Wrong response received: unexpected opcod.\n";
+          continue;
+        }
+
+#ifdef _USE_DPDK_CLIENT_
+        FreeDPDKPacket(mbuf);
+#endif
+      }
+      total_recv_n += recv_n;
     }
-
-    return 0;
   }
 
-  int get(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
-          uint16_t key_len, uint8_t *val_out, uint32_t *val_out_length) {
-    uint32_t len = 0;
-    int res = form_get(request_id, sequence_n, key, key_len, &len);
-    if (res != 0) return res;
+private:
+#ifdef _USE_DPDK_CLIENT_
+  // We only need the MAC address for the DPDK stack.
+  std::string serverMacAddrStr;
+  rte_ether_addr serverMacAddr;
 
-    res = send(len);
-    if (res != 0) return res;
+  // Main object storing DPDK-related low-level information.
+  DPDKObj dpdkObj;
 
-    if (dispatchMode == DispatchMode::kBlocking) {
-      assert(val_out != nullptr);
-      assert(val_out_length != nullptr);
-
-      uint16_t req_id_rcv;
-      uint16_t seq_n_recv;
-      recv();
-      int ret =
-          parse_get_response(&req_id_rcv, &seq_n_recv, val_out, val_out_length);
-      if (ret != kOK)  // || req_id_rcv != request_id)
-        return -1;
-      else
-        return 0;
-    }
-
-    return 0;
-  }
-
-  size_t dumpRecvStat() const {
-    if (dispatchMode == DispatchMode::kNonBlocking)
-      return nonBlockRecvStat.totalRecved;
-    else {
-      std::cout << "WARNING: attempting to read recv statistics for a blocking "
-                   "connection, this does not really make sense.\n";
-    }
-
-    return 0;
-  }
-
-  void zeroOutRecvStat() {
-    nonBlockRecvStat.totalRecved = 0;
-    nonBlockRecvStat.setRecved = 0;
-    nonBlockRecvStat.getRecved = 0;
-  }
-
- private:
-  // Net things.
+#else
+  // Full Linux UDP/IP stack here.
   std::string serverHostname;
-  uint16_t port;
   sockaddr_in serverAddress;
+  uint16_t port;
+
+  // Just a UNIX socket.
   int sock;
-  DispatchMode dispatchMode;
 
-  // Buffers.
-  uint8_t *tx_buff;
-  uint8_t *rx_buff;
+  // Buffers to keep data.
+  std::vector<std::pair<size_t, uint8_t *>> rx_buff;
+  std::vector<std::pair<size_t, uint8_t *>> tx_buff;
 
-  // Recv thread and statistics for nonBlocking calls.
-  volatile bool runRecvThread;
-  std::thread recvThread;
-  struct NonBlockStat {
-    size_t totalRecved;
-    size_t setRecved;
-    size_t getRecved;
-  };
-  NonBlockStat nonBlockRecvStat;
+#endif
 
-  // Memcached has it's own extra header for the UDP protocol; it's not really
-  // documented, but can be found here: memcached.c:build_udp_header().
-  struct MemcacheUdpHeader {
-    uint8_t request_id[2];
-    uint8_t udp_sequence[2];
-    uint8_t udp_total[2];
-    uint8_t RESERVED[2];
-  } __attribute__((packed));
-  static_assert(sizeof(MemcacheUdpHeader) == 8);
+  // Batching.
+  uint16_t batchSize;
+  uint16_t currentBatch;
 
-  struct ReqHdr {
-    uint8_t magic;
-    uint8_t opcode;
-    uint8_t key_length[2];
-    uint8_t extra_length;
-    uint8_t data_type;
-    uint8_t RESERVED[2];
-    uint8_t total_body_length[4];
-    uint8_t opaque[4];
-    uint8_t CAS[8];
-  } __attribute__((packed));
-  static_assert(sizeof(ReqHdr) == 24);
-
-  struct RespHdr {
-    uint8_t magic;
-    uint8_t opcode;
-    uint8_t key_length[2];
-    uint8_t extra_length;
-    uint8_t data_type;
-    uint8_t status[2];
-    uint8_t total_body_length[4];
-    uint8_t opaque[4];
-    uint8_t CAS[8];
-  } __attribute__((packed));
-  static_assert(sizeof(RespHdr) == 24);
-
-  int form_set(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
-               uint16_t key_len, const uint8_t *val, uint32_t val_len,
-               uint32_t *pckt_length) {
-    // Form memcached UDP header.
-    MemcacheUdpHeader hdr = {
-        .request_id = {static_cast<uint8_t>((request_id >> 8) & 0xff),
-                       static_cast<uint8_t>(request_id & 0xff)},
-        .udp_sequence = {static_cast<uint8_t>((sequence_n >> 8) & 0xff),
-                         static_cast<uint8_t>(sequence_n & 0xff)},
-        .udp_total = {0, 1},
-        .RESERVED = {0, 0}};
-    std::memcpy(tx_buff, &hdr, sizeof(MemcacheUdpHeader));
-
-    // Form packet.
-    constexpr uint8_t kExtraSize = 8;
-    uint32_t total_payld_length = kExtraSize + key_len + val_len;
-    uint32_t total_length =
-        sizeof(MemcacheUdpHeader) + sizeof(ReqHdr) + total_payld_length;
-    if (total_length > kMaxPacketSize) {
-      std::cerr << "Packet size of " << total_length << " is too large\n";
+  int FormSet(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
+              uint16_t key_len, const uint8_t *val, uint32_t val_len) {
+#ifdef _USE_DPDK_CLIENT_
+    // Get packet buffer.
+    struct rte_mbuf *pckt = GetNextDPDKTxBuffer(&dpdkObj);
+    if (pckt == nullptr) {
+      std::cerr << "Failed to get tx buffer for the packet.\n";
       return -1;
     }
-    ReqHdr req_hdr = {
-        .magic = 0x80,
-        .opcode = 0x01,  // set
-        .key_length = {static_cast<uint8_t>((key_len >> 8) & 0xff),
-                       static_cast<uint8_t>(key_len & 0xff)},
-        .extra_length = kExtraSize,
-        .data_type = 0x00,
-        .RESERVED = 0x00,
-        .total_body_length =
-            {static_cast<uint8_t>((total_payld_length >> 24) & 0xff),
-             static_cast<uint8_t>((total_payld_length >> 16) & 0xff),
-             static_cast<uint8_t>((total_payld_length >> 8) & 0xff),
-             static_cast<uint8_t>(total_payld_length & 0xff)},
-        .opaque = 0x00,
-        .CAS = 0x00};
-    // Fill packet: unlimited storage time.
+
+    uint8_t *tx_buff_ptr = ExtractPacketPayload(pckt);
+#else
+    uint8_t *tx_buff_ptr = tx_buff[currentBatch].second;
+#endif
+
+    // Form memcached UDP header.
+    size_t h_size =
+        HelperFormUdpHeader(reinterpret_cast<MemcacheUdpHeader *>(tx_buff_ptr),
+                            request_id, sequence_n);
+    tx_buff_ptr += sizeof(MemcacheUdpHeader);
+
+    // Form request header.
+    size_t rh_size = HelperFormSetReqHeader(
+        reinterpret_cast<ReqHdr *>(tx_buff_ptr), key_len, val_len);
+    tx_buff_ptr += sizeof(ReqHdr);
+
+    // Fill packet: extra, unlimited storage time.
     uint32_t extra[2] = {0x00, 0x00};
-    std::memcpy(tx_buff + sizeof(MemcacheUdpHeader), &req_hdr, sizeof(ReqHdr));
-    std::memcpy(tx_buff + sizeof(MemcacheUdpHeader) + sizeof(ReqHdr), extra,
-                kExtraSize);
-    std::memcpy(
-        tx_buff + sizeof(MemcacheUdpHeader) + sizeof(ReqHdr) + kExtraSize, key,
-        key_len);
-    std::memcpy(tx_buff + sizeof(MemcacheUdpHeader) + sizeof(ReqHdr) +
-                    kExtraSize + key_len,
-                val, val_len);
+    std::memcpy(tx_buff_ptr, extra, kExtraSizeForSet);
+    tx_buff_ptr += kExtraSizeForSet;
 
-    *pckt_length = total_length;
-    return 0;
-  }
+    // Fill packet: key.
+    std::memcpy(tx_buff_ptr, key, key_len);
+    tx_buff_ptr += key_len;
 
-  int form_get(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
-               uint16_t key_len, uint32_t *pckt_length) {
-    // Form memcached UDP header.
-    MemcacheUdpHeader hdr = {
-        .request_id = {static_cast<uint8_t>((request_id >> 8) & 0xff),
-                       static_cast<uint8_t>(request_id & 0xff)},
-        .udp_sequence = {static_cast<uint8_t>((sequence_n >> 8) & 0xff),
-                         static_cast<uint8_t>(sequence_n & 0xff)},
-        .udp_total = {0, 1},
-        .RESERVED = {0, 0}};
-    std::memcpy(tx_buff, &hdr, sizeof(MemcacheUdpHeader));
+    // Fill packet: value.
+    std::memcpy(tx_buff_ptr, val, val_len);
 
-    // Form packet.
-    uint32_t total_payld_length = key_len;
-    uint32_t total_length =
-        sizeof(MemcacheUdpHeader) + sizeof(ReqHdr) + total_payld_length;
+    // Check total packet size.
+    uint32_t total_length = h_size + rh_size;
     if (total_length > kMaxPacketSize) {
       std::cerr << "Packet size of " << total_length << " is too large\n";
       return -1;
     }
-    ReqHdr req_hdr = {
-        .magic = 0x80,
-        .opcode = 0x00,  // get
-        .key_length = {static_cast<uint8_t>((key_len >> 8) & 0xff),
-                       static_cast<uint8_t>(key_len & 0xff)},
-        .extra_length = 0x00,
-        .data_type = 0x00,
-        .RESERVED = 0x00,
-        .total_body_length =
-            {static_cast<uint8_t>((total_payld_length >> 24) & 0xff),
-             static_cast<uint8_t>((total_payld_length >> 16) & 0xff),
-             static_cast<uint8_t>((total_payld_length >> 8) & 0xff),
-             static_cast<uint8_t>(total_payld_length & 0xff)},
-        .opaque = 0x00,
-        .CAS = 0x00};
-    // Fill packet.
-    std::memcpy(tx_buff + sizeof(MemcacheUdpHeader), &req_hdr, sizeof(ReqHdr));
-    std::memcpy(tx_buff + sizeof(MemcacheUdpHeader) + sizeof(ReqHdr), key,
-                key_len);
 
-    *pckt_length = total_length;
+#ifdef _USE_DPDK_CLIENT_
+    AppendPacketHeader(&dpdkObj, pckt, &serverMacAddr, total_length);
+#else
+    tx_buff[currentBatch].first = total_length;
+#endif
+
     return 0;
   }
 
-  Status parse_set_response(uint16_t *request_id, uint16_t *sequence_n) const {
-    const MemcacheUdpHeader *udp_hdr =
-        reinterpret_cast<MemcacheUdpHeader *>(rx_buff);
-    *request_id = (udp_hdr->request_id[1] << 8) | (udp_hdr->request_id[0]);
-    *sequence_n = (udp_hdr->udp_sequence[1] << 8) | (udp_hdr->udp_sequence[0]);
-
-    const RespHdr *rsp_hdr =
-        reinterpret_cast<RespHdr *>(rx_buff + sizeof(MemcacheUdpHeader));
-    if (rsp_hdr->magic != 0x81) {
-      std::cerr << "Wrong response received: " << (int)(rsp_hdr->magic) << "\n";
-      return kOtherError;
-    }
-
-    Status status =
-        static_cast<Status>(rsp_hdr->status[1] | (rsp_hdr->status[0] << 8));
-    return status;
-  }
-
-  Status parse_get_response(uint16_t *request_id, uint16_t *sequence_n,
-                            uint8_t *val, uint32_t *val_len) const {
-    const MemcacheUdpHeader *udp_hdr =
-        reinterpret_cast<MemcacheUdpHeader *>(rx_buff);
-    *request_id = (udp_hdr->request_id[1] << 8) | (udp_hdr->request_id[0]);
-    *sequence_n = (udp_hdr->udp_sequence[1] << 8) | (udp_hdr->udp_sequence[0]);
-
-    const RespHdr *rsp_hdr =
-        reinterpret_cast<RespHdr *>(rx_buff + sizeof(MemcacheUdpHeader));
-    if (rsp_hdr->magic != 0x81) {
-      std::cerr << "Wrong response received!\n";
-      return kOtherError;
-    }
-
-    Status status =
-        static_cast<Status>(rsp_hdr->status[1] | (rsp_hdr->status[0] << 8));
-    if (status == kOK) {
-      uint8_t extra_len_ = rsp_hdr->extra_length;
-      uint16_t key_len_ =
-          rsp_hdr->key_length[1] | (rsp_hdr->key_length[0] << 8);
-      uint32_t total_body_len = rsp_hdr->total_body_length[3] |
-                                (rsp_hdr->total_body_length[2] << 8) |
-                                (rsp_hdr->total_body_length[1] << 16) |
-                                (rsp_hdr->total_body_length[0] << 24);
-      uint32_t val_len_ = total_body_len - extra_len_ - key_len_;
-      std::memcpy(val,
-                  rx_buff + sizeof(MemcacheUdpHeader) + sizeof(RespHdr) +
-                      extra_len_ + key_len_,
-                  val_len_);
-
-      *val_len = val_len_;
-    }
-
-    return status;
-  }
-
-  int send(size_t length) {
-    ssize_t bytesSent =
-        sendto(sock, tx_buff, length, MSG_CONFIRM,
-               (const struct sockaddr *)&serverAddress, sizeof(serverAddress));
-    if (bytesSent != length) {
-      std::cerr << "Failed to send data to the server." << std::endl;
-      close(sock);
+  int FormGet(uint16_t request_id, uint16_t sequence_n, const uint8_t *key,
+              uint16_t key_len) {
+#ifdef _USE_DPDK_CLIENT_
+    // Get packet buffer.
+    struct rte_mbuf *pckt = GetNextDPDKTxBuffer(&dpdkObj);
+    if (pckt == nullptr) {
+      std::cerr << "Failed to get tx buffer for the packet.\n";
       return -1;
     }
 
+    uint8_t *tx_buff_ptr = ExtractPacketPayload(pckt);
+#else
+    uint8_t *tx_buff_ptr = tx_buff[currentBatch].second;
+#endif
+
+    // Form memcached UDP header.
+    size_t h_size =
+        HelperFormUdpHeader(reinterpret_cast<MemcacheUdpHeader *>(tx_buff_ptr),
+                            request_id, sequence_n);
+    tx_buff_ptr += sizeof(MemcacheUdpHeader);
+
+    // Form request header.
+    size_t rh_size = HelperFormGetReqHeader(
+        reinterpret_cast<ReqHdr *>(tx_buff_ptr), key_len);
+    tx_buff_ptr += sizeof(ReqHdr);
+
+    // Fill packet: key.
+    std::memcpy(tx_buff_ptr, key, key_len);
+
+    // Check total packet size.
+    uint32_t total_length = h_size + rh_size;
+    if (total_length > kMaxPacketSize) {
+      std::cerr << "Packet size of " << total_length << " is too large\n";
+      return -1;
+    }
+
+#ifdef _USE_DPDK_CLIENT_
+    AppendPacketHeader(&dpdkObj, pckt, &serverMacAddr, total_length);
+#else
+    tx_buff[currentBatch].first = total_length;
+#endif
     return 0;
   }
 
-  void recv() {
-    sockaddr_in serverAddress_rvc;
-    socklen_t len;
-    recvfrom(sock, rx_buff, kMaxPacketSize, 0,
-             (struct sockaddr *)&serverAddress_rvc, &len);
+  // Append to a batch or allocate a new batch.
+  int BatchOrAllocate() {
+#ifdef _USE_DPDK_CLIENT_
+    if (currentBatch == 0) {
+      if (AllocateDPDKTxBuffers(&dpdkObj, batchSize)) {
+        std::cerr << "Failed to allocate packets for tx." << std::endl;
+        return -1;
+      }
+    }
+#endif
+    return 0;
   }
 
-  // Runs in nonBlocking mode to receive responses.
-  void recvCallback() {
-    while (runRecvThread) {
-      recv();
-      ++nonBlockRecvStat.totalRecved;
+  // Append to a batch or send the batch.
+  int BatchOrSend() {
+    // Check if the batch is full and send.
+    if (currentBatch < batchSize - 1) {
+      ++currentBatch;
+    } else {
+      // Send it.
+      int res = Send();
+      currentBatch = 0;
+      if (res != 0)
+        return res;
     }
+    return 0;
+  }
+
+  int Send() {
+#ifdef _USE_DPDK_CLIENT_
+    int ret = SendBatch(&dpdkObj);
+    if (ret) {
+      std::cerr << "Failed to send data to the server." << std::endl;
+      return -1;
+    }
+#else
+    for (uint16_t i = 0; i < batchSize; ++i) {
+      ssize_t bytesSent = sendto(
+          sock, tx_buff[i].second, tx_buff[i].first, MSG_CONFIRM,
+          (const struct sockaddr *)&serverAddress, sizeof(serverAddress));
+      if (bytesSent != tx_buff[i].first) {
+        std::cerr << "Failed to send data to the server." << std::endl;
+        return -1;
+      }
+    }
+#endif
+
+    return 0;
+  }
+
+  // This is a blocking call.
+  int Recv() {
+#ifdef _USE_DPDK_CLIENT_
+    int pckt_n = 0;
+    while (pckt_n == 0) {
+      pckt_n = RecvOverDPDK(&dpdkObj);
+    }
+    return pckt_n;
+#else
+    for (uint16_t i = 0; i < batchSize; ++i) {
+      sockaddr_in serverAddress_rvc;
+      socklen_t len;
+      recvfrom(sock, rx_buff[i].second, kMaxPacketSize, 0,
+               (struct sockaddr *)&serverAddress_rvc, &len);
+    }
+    return batchSize;
+#endif
   }
 };
 

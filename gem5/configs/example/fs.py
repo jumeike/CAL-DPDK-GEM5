@@ -128,6 +128,7 @@ def build_test_system(np):
                 num_nics=args.num_nics,
                 # Loadgens.
                 num_loadgens=args.num_loadgens,
+                loadgen_stack_mode=args.loadgen_stack,
                 load_generator_type="Pcap",
                 loadgen_pcap_filename=args.loadgen_pcap_filename,
                 loadgen_start=args.loadgen_start,
@@ -204,96 +205,140 @@ def build_test_system(np):
             cpu.createInterruptController()
 
             test_sys.ruby._cpu_ports[i].connectCpuPorts(cpu)
-
-    else:
-        if args.caches or args.l2cache or args.l3cache:
-            if args.perf_io:
-                test_sys.iocache = PerfIOCache(addr_ranges = test_sys.mem_ranges, is_iocache = True, send_header_only = args.send_header_only)
-            else:
-                test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges, is_iocache = True, send_header_only = args.send_header_only)
+    # else:
+    #     if args.caches or args.l2cache or args.l3cache:
+    #         if args.perf_io:
+    #             test_sys.iocache = PerfIOCache(addr_ranges = test_sys.mem_ranges, is_iocache = True, send_header_only = args.send_header_only)
+    #         else:
+    #             test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges, is_iocache = True, send_header_only = args.send_header_only)
             
-            # By default the IOCache runs at the system clock
-        #if args.caches or args.l3cache:     # SHIN. For L3
-            # By default the IOCache runs at the system clock
-            #test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges)
+    #         # By default the IOCache runs at the system clock
+    #     #if args.caches or args.l3cache:     # SHIN. For L3
+    #         # By default the IOCache runs at the system clock
+    #         #test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges)
 
-            #test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges, is_iocache = True, send_header_only = args.send_header_only)
-            test_sys.iocache.cpu_side = test_sys.iobus.master
-            #test_sys.iocache.mem_side = test_sys.membus.slave
+    #         #test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges, is_iocache = True, send_header_only = args.send_header_only)
+    #         test_sys.iocache.cpu_side = test_sys.iobus.master
+    #         #test_sys.iocache.mem_side = test_sys.membus.slave
 
-            CacheConfig.config_cache(args, test_sys)
+    #         CacheConfig.config_cache(args, test_sys)
 
-            # mlc ddio
-            if args.mlc_adaptive_ddio:
-                if not args.ddio_enabled:
-                    fatal("Cannot use IDIO w/o DDIO")
-                test_sys.ddio_xbar = DdioBridge(do_not_pass_to_mlc = 0,
-                                                snoop_via_memside = 0,
-                                                normal_DMA_mode = 0,
-                                                ddio_option_app0 = 0,
-                                                ddio_option_app1 = 0,
-                                                ddio_option_app2 = 0,
-                                                ddio_option_app3 = 0,
-                                                dynamic_ddio = 0,
-                                                window_size = 0,
-                                                threshhold_otf = 0,
-                                                threshhold_gradchange = 0,
-                                                threshhold_abs = 0,
-                                                mlc_share = 0,
-                                                send_prefetch_hint = args.send_prefetch_hint,
-                                                send_header_only = args.send_header_only)
+    #         # mlc ddio
+    #         if args.mlc_adaptive_ddio:
+    #             if not args.ddio_enabled:
+    #                 fatal("Cannot use IDIO w/o DDIO")
+    #             test_sys.ddio_xbar = DdioBridge(do_not_pass_to_mlc = 0,
+    #                                             snoop_via_memside = 0,
+    #                                             normal_DMA_mode = 0,
+    #                                             ddio_option_app0 = 0,
+    #                                             ddio_option_app1 = 0,
+    #                                             ddio_option_app2 = 0,
+    #                                             ddio_option_app3 = 0,
+    #                                             dynamic_ddio = 0,
+    #                                             window_size = 0,
+    #                                             threshhold_otf = 0,
+    #                                             threshhold_gradchange = 0,
+    #                                             threshhold_abs = 0,
+    #                                             mlc_share = 0,
+    #                                             send_prefetch_hint = args.send_prefetch_hint,
+    #                                             send_header_only = args.send_header_only)
 
-                test_sys.iocache.mem_side = test_sys.ddio_xbar.cpuside
-                test_sys.ddio_xbar.llcside = test_sys.tol3bus.slave
-                test_sys.ddio_xbar.memside = test_sys.membus.slave
+    #             test_sys.iocache.mem_side = test_sys.ddio_xbar.cpuside
+    #             test_sys.ddio_xbar.llcside = test_sys.tol3bus.slave
+    #             test_sys.ddio_xbar.memside = test_sys.membus.slave
 
                 
 
-                #if options.share_l2 == 0:
-                for i in range(0, args.num_cpus):
-                    test_sys.ddio_xbar.mlcside = test_sys.cpu[i].toL2Bus.slave
-                    #test_sys.cpu[i].l2cache.otfport = test_sys.ddio_xbar.otfport
+    #             #if options.share_l2 == 0:
+    #             for i in range(0, args.num_cpus):
+    #                 test_sys.ddio_xbar.mlcside = test_sys.cpu[i].toL2Bus.slave
+    #                 #test_sys.cpu[i].l2cache.otfport = test_sys.ddio_xbar.otfport
 
-                #test_sys.l3.otfport = test_sys.ddio_xbar.otfport
-                #else:
-                #    for i in range(0, options.num_cpus / 2):
-                #        test_sys.ddio_xbar.mlcside = test_sys.cpu[i*2].toL2Bus.slave
-                #        test_sys.cpu[i*2].l2cache.otfport = test_sys.ddio_xbar.otfport
+    #             #test_sys.l3.otfport = test_sys.ddio_xbar.otfport
+    #             #else:
+    #             #    for i in range(0, options.num_cpus / 2):
+    #             #        test_sys.ddio_xbar.mlcside = test_sys.cpu[i*2].toL2Bus.slave
+    #             #        test_sys.cpu[i*2].l2cache.otfport = test_sys.ddio_xbar.otfport
 
-            elif args.ddio_enabled:
-                test_sys.ddio_xbar = DdioBridge(do_not_pass_to_mlc = 1,
-                                                snoop_via_memside = 0,
-                                                normal_DMA_mode = 0,
-                                                ddio_option_app0 = 0,
-                                                ddio_option_app1 = 0,
-                                                ddio_option_app2 = 0,
-                                                ddio_option_app3 = 0,
-                                                dynamic_ddio = 0,
-                                                window_size = 0,
-                                                threshhold_otf = 0,
-                                                threshhold_gradchange = 0,
-                                                threshhold_abs = 0,
-                                                mlc_share = 0,
-                                                send_prefetch_hint = args.send_prefetch_hint,
-                                                send_header_only = args.send_header_only)
+    #         elif args.ddio_enabled:
+    #             test_sys.ddio_xbar = DdioBridge(do_not_pass_to_mlc = 1,
+    #                                             snoop_via_memside = 0,
+    #                                             normal_DMA_mode = 0,
+    #                                             ddio_option_app0 = 0,
+    #                                             ddio_option_app1 = 0,
+    #                                             ddio_option_app2 = 0,
+    #                                             ddio_option_app3 = 0,
+    #                                             dynamic_ddio = 0,
+    #                                             window_size = 0,
+    #                                             threshhold_otf = 0,
+    #                                             threshhold_gradchange = 0,
+    #                                             threshhold_abs = 0,
+    #                                             mlc_share = 0,
+    #                                             send_prefetch_hint = args.send_prefetch_hint,
+    #                                             send_header_only = args.send_header_only)
 
-                test_sys.iocache.mem_side = test_sys.ddio_xbar.cpuside
-                test_sys.ddio_xbar.llcside = test_sys.tol3bus.slave
-                test_sys.ddio_xbar.memside = test_sys.membus.slave
+    #             test_sys.iocache.mem_side = test_sys.ddio_xbar.cpuside
+    #             test_sys.ddio_xbar.llcside = test_sys.tol3bus.slave
+    #             test_sys.ddio_xbar.memside = test_sys.membus.slave
 
-                #test_sys.l3.otfport = test_sys.ddio_xbar.otfport
+    #             #test_sys.l3.otfport = test_sys.ddio_xbar.otfport
 
-                #if options.share_l2 == 0:
-                for i in range(0, options.num_cpus):
-                    test_sys.ddio_xbar.mlcside = test_sys.cpu[i].toL2Bus.slave
-                    test_sys.cpu[i].l2cache.otfport = test_sys.ddio_xbar.otfport
-                #else:
-                #    for i in range(0, options.num_cpus / 2):
-                #        test_sys.ddio_xbar.mlcside = test_sys.cpu[i*2].toL2Bus.slave
-                #        test_sys.cpu[i*2].l2cache.otfport = test_sys.ddio_xbar.otfport
-            else:
-                test_sys.iocache.mem_side = test_sys.membus.slave
+    #             #if options.share_l2 == 0:
+    #             for i in range(0, options.num_cpus):
+    #                 test_sys.ddio_xbar.mlcside = test_sys.cpu[i].toL2Bus.slave
+    #                 test_sys.cpu[i].l2cache.otfport = test_sys.ddio_xbar.otfport
+    #             #else:
+    #             #    for i in range(0, options.num_cpus / 2):
+    #             #        test_sys.ddio_xbar.mlcside = test_sys.cpu[i*2].toL2Bus.slave
+    #             #        test_sys.cpu[i*2].l2cache.otfport = test_sys.ddio_xbar.otfport
+    #         else:
+    #             test_sys.iocache.mem_side = test_sys.membus.slave
 
+    #     elif args.caches or args.l2cache:
+    #         # By default the IOCache runs at the system clock
+    #         test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges,
+    #                                     is_iocache = True,
+    #                                     ddio_disabled = args.ddio_disabled,
+    #                                     size = args.iocache_size,
+    #                                     assoc = args.iocache_assoc, tag_latency = 2,
+    #                                     data_latency = 2, response_latency = 2,
+    #                                     write_buffers = 64)
+
+    #         test_sys.iocache.cpu_side = test_sys.iobus.master
+    #         test_sys.iocache.mem_side = test_sys.membus.slave
+
+    #     else:
+    #         CacheConfig.config_cache(args, test_sys)
+    #         if not args.external_memory_system:
+    #             test_sys.iobridge = Bridge(delay='50ns', ranges = test_sys.mem_ranges)
+    #             test_sys.iobridge.slave = test_sys.iobus.master
+    #             test_sys.iobridge.master = test_sys.membus.slave
+    else:
+    # -        if options.caches or options.l2cache:
+        CacheConfig.config_cache(args, test_sys)
+        if args.caches and args.l3cache and args.ddio_enabled:
+            # By default the IOCache runs at the system clock
+    # -     test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges)
+            test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges,
+                                    is_iocache = True,
+                                    ddio_enabled = True,
+                                    assoc = 16, tag_latency = 2,
+                                    data_latency = 2, response_latency = 2,
+                                    write_buffers = 64)
+
+            test_sys.iocache.cpu_side = test_sys.iobus.master
+            test_sys.iocache.mem_side = test_sys.tol3bus.slave
+        elif args.caches and args.l2cache and args.ddio_enabled:
+            # By default the IOCache runs at the system clock
+            test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges,
+                                    is_iocache = True,
+                                    ddio_enabled = True,
+                                    assoc = 16, tag_latency = 2,
+                                    data_latency = 2, response_latency = 2,
+                                    write_buffers = 64)
+
+            test_sys.iocache.cpu_side = test_sys.iobus.master
+            test_sys.iocache.mem_side = test_sys.tol2bus.slave
         elif args.caches or args.l2cache:
             # By default the IOCache runs at the system clock
             test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges,
@@ -306,13 +351,10 @@ def build_test_system(np):
 
             test_sys.iocache.cpu_side = test_sys.iobus.master
             test_sys.iocache.mem_side = test_sys.membus.slave
-
-        else:
-            CacheConfig.config_cache(args, test_sys)
-            if not args.external_memory_system:
-                test_sys.iobridge = Bridge(delay='50ns', ranges = test_sys.mem_ranges)
-                test_sys.iobridge.slave = test_sys.iobus.master
-                test_sys.iobridge.master = test_sys.membus.slave
+        elif not args.external_memory_system:
+            test_sys.iobridge = Bridge(delay='50ns', ranges = test_sys.mem_ranges)
+            test_sys.iobridge.slave = test_sys.iobus.master
+            test_sys.iobridge.master = test_sys.membus.slave
 
         # Sanity check
         if args.simpoint_profile:

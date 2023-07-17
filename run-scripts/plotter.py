@@ -28,7 +28,7 @@ def get_latency(exp):
             return float(line.split("system.loadgens.LoadGeneratorPcap.latency::mean")[1].split()[0])
 
 
-path_to_stats = "/home/sa10/CAL-DPDK-GEM5/rundir/"
+path_to_stats = "/workspaces/CAL-DPDK-GEM5/rundir/request_trace-test-memcached_kernel_newkernel/"
 print('Collecting experiments...')
 experiments = collect_experiments(path_to_stats)
 print('Found {} experiments'.format(len(experiments)))
@@ -56,11 +56,11 @@ print(*L2_LATENCIES, sep='\n')
 
 
 
-# FREQS = [x.split('/')[-2].split('-')[1].split('f')[0] for x in FREQ_EXPS]
-# FREQ_LATENCIES = get_latencies(FREQ_EXPS)
+FREQS = [x.split('/')[-2].split('-')[1].split('f')[0] for x in FREQ_EXPS]
+FREQ_LATENCIES = get_latencies(FREQ_EXPS)
 
 # ## sort freq and freq_latencies together
-# FREQS, FREQ_LATENCIES = zip(*sorted(zip(FREQS, FREQ_LATENCIES)))
+FREQS, FREQ_LATENCIES = zip(*sorted(zip(FREQS, FREQ_LATENCIES)))
 
-# print(FREQS)
-# print(*FREQ_LATENCIES, sep='\n')
+print(FREQS)
+print(*FREQ_LATENCIES, sep='\n')

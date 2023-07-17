@@ -64,6 +64,16 @@ LoadGeneratorPcap::LoadGeneratorPcap(const LoadGeneratorPcapParams &p)
     inform("Pcap trace file is loaded: %s", pcapFilename.c_str());
   }
 
+  // Stack mode.
+  if (p.stack_mode == "KernelStack") {
+    stackMode = StackMode::Kernel;
+    DPRINTF(LoadgenDebug, "Running Pcap load generator in Kernel stack mode\n");
+  } else if (p.stack_mode == "DPDKStack") {
+    stackMode = StackMode::DPDK;
+    DPRINTF(LoadgenDebug, "Running Pcap load generator in DPDK stack mode\n");
+  } else
+    fatal("Unknown stack mode");
+
   // Other params.
   if (p.replay_mode == "SimpleReplay") {
     replayMode = ReplayMode::SimpleReplay;
@@ -85,11 +95,13 @@ LoadGeneratorPcap::LoadGeneratorPcap(const LoadGeneratorPcapParams &p)
 }
 
 LoadGeneratorPcap::~LoadGeneratorPcap() {
-  if (pcap_h != nullptr) pcap_close(pcap_h);
+  if (pcap_h != nullptr) 
+    pcap_close(pcap_h);
 }
 
 void LoadGeneratorPcap::startup() {
-  if (curTick() > stopTick) return;
+  if (curTick() > stopTick) 
+    return;
 
   if (curTick() > startTick) {
     DPRINTF(LoadgenDebug, "Starting LoadGenPcap, 1\n");
@@ -116,7 +128,8 @@ void LoadGeneratorPcap::buildEthernetHeader(EthPacketPtr ethpacket) const {
 
   uint16_t size = ethpacket->length;
 
-  if (1 != htons(1)) size = htons(size);
+  if (1 != htons(1)) 
+    size = htons(size);
 
   uint8_t head[kEtherHeaderSize];
   memcpy(head, dst_mac, 6);
@@ -140,8 +153,10 @@ void LoadGeneratorPcap::sendPacket() {
     if (ret < 0) {
       // Perhaps EOF.
       DPRINTF(LoadgenDebug, "End of pcap trace is reached!\n");
+      DPRINTF(LoadgenDebug, "Nothing will be scheduled in the loadgen, exiting here.\n");
+      DPRINTF(LoadgenDebug, "Bye!\n");
       // exitSimLoop("END OF PCAP TRACE" "SIM TERMINATED BY LOADGEN"); 
-      schedule(checkLossEvent, curTick() + kLossCheckWaitCycles);
+      // schedule(checkLossEvent, curTick() + kLossCheckWaitCycles);
       return;
       // TODO: can start over...
     }
@@ -164,56 +179,66 @@ void LoadGeneratorPcap::sendPacket() {
     return;
   }
 
-  // Check it is an IPv4 packet.
-  const ether_header *eth_hdr =
-      reinterpret_cast<const ether_header *>(pcap_data);
-  uint16_t ether_type = ntohs(eth_hdr->ether_type);
-  if (ether_type != ETHERTYPE_IP) {
-    DPRINTF(LoadgenDebug, "Not an IP packet in trace detected, skip it...\n");
-    schedule(sendPacketEvent, curTick() + 1);
-    return;
-  }
-
-  pcap_data += sizeof(ether_header);
-  const ip *iph = reinterpret_cast<const ip *>(pcap_data);
-  if (iph->ip_v != 0x04) {
-    DPRINTF(LoadgenDebug, "Not an IPv4 packet in trace detected, skip it...\n");
-    schedule(sendPacketEvent, curTick() + 1);
-    return;
-  }
-
-  // Check if it is a UDP packet.
-  if (iph->ip_p != IPPROTO_UDP) {
-    DPRINTF(LoadgenDebug, "Not an UDP packet in trace detected, skip it...\n");
-    schedule(sendPacketEvent, curTick() + 1);
-    return;
-  }
-
-  // If needed - filter by dest port.
-  pcap_data += (iph->ip_hl << 2);
-  const udphdr *udp = reinterpret_cast<const udphdr *>(pcap_data);
-  if (ntohs(udp->uh_dport) != portFilter) {
-    DPRINTF(LoadgenDebug, "Packet was filter-out by port...\n");
-    schedule(sendPacketEvent, curTick() + 1);
-    return;
-  }
-
-  // Replace the source and destination IP address by the one in configuration
-  // (to match with the OS ifconfig).
-  // TODO: disabling for now as this does not work, perhaps the checksum needs
-  // to be hacked as well.
-
-  // ip *iph_mutable = const_cast<ip *>(iph);
-  // inet_aton(destIP.c_str(), &iph_mutable->ip_dst);
-  // inet_aton(srcIP.c_str(), &iph_mutable->ip_src);
-
-  // Merge with our own Ethernet header.
-  assert(pcap_header->len == ntohs(iph->ip_len) + kEtherHeaderSize);
+  // Create packet depending on the stack type.
   EthPacketPtr txPacket = std::make_shared<EthPacketData>(pcap_header->len);
   txPacket->length = pcap_header->len;
-  buildEthernetHeader(txPacket);
-  // Copy our payload.
-  memcpy(txPacket->data + kEtherHeaderSize, iph, ntohs(iph->ip_len));
+  if (stackMode == StackMode::Kernel) {
+    // Check it is an IPv4 packet.
+    const ether_header *eth_hdr =
+        reinterpret_cast<const ether_header *>(pcap_data);
+    uint16_t ether_type = ntohs(eth_hdr->ether_type);
+    if (ether_type != ETHERTYPE_IP) {
+      DPRINTF(LoadgenDebug, "Not an IP packet in trace detected, skip it...\n");
+      schedule(sendPacketEvent, curTick() + 1);
+      return;
+    }
+
+    pcap_data += sizeof(ether_header);
+    const ip *iph = reinterpret_cast<const ip *>(pcap_data);
+    if (iph->ip_v != 0x04) {
+      DPRINTF(LoadgenDebug,
+              "Not an IPv4 packet in trace detected, skip it...\n");
+      schedule(sendPacketEvent, curTick() + 1);
+      return;
+    }
+
+    // Check if it is a UDP packet.
+    if (iph->ip_p != IPPROTO_UDP) {
+      DPRINTF(LoadgenDebug,
+              "Not an UDP packet in trace detected, skip it...\n");
+      schedule(sendPacketEvent, curTick() + 1);
+      return;
+    }
+
+    // If needed - filter by dest port.
+    pcap_data += (iph->ip_hl << 2);
+    const udphdr *udp = reinterpret_cast<const udphdr *>(pcap_data);
+    if (ntohs(udp->uh_dport) != portFilter) {
+      DPRINTF(LoadgenDebug, "Packet was filter-out by port...\n");
+      schedule(sendPacketEvent, curTick() + 1);
+      return;
+    }
+
+    // Replace the source and destination IP address by the one in configuration
+    // (to match with the OS ifconfig).
+    // TODO: disabling for now as this does not work, perhaps the checksum needs
+    // to be hacked as well.
+    // ip *iph_mutable = const_cast<ip *>(iph);
+    // inet_aton(destIP.c_str(), &iph_mutable->ip_dst);
+    // inet_aton(srcIP.c_str(), &iph_mutable->ip_src);
+
+    // Merge with our own Ethernet header.
+    assert(pcap_header->len == ntohs(iph->ip_len) + kEtherHeaderSize);
+    buildEthernetHeader(txPacket);
+    // Copy our payload.
+    memcpy(txPacket->data + kEtherHeaderSize, iph, ntohs(iph->ip_len));
+  } else {
+    // For DPDK stack, just change the Ethernet header and copy the rest.
+    buildEthernetHeader(txPacket);
+    pcap_data += sizeof(ether_header);
+    memcpy(txPacket->data + kEtherHeaderSize, pcap_data,
+           pcap_header->len - kEtherHeaderSize);
+  }
 
   // Send packet.
   interface->sendPacket(txPacket);
@@ -278,7 +303,7 @@ bool LoadGeneratorPcap::processRxPkt(EthPacketPtr pkt) {
   uint64_t sendTick = packetSendTimes.front();
   if (packetSendTimes.size() > 0)
     packetSendTimes.pop();
-  float delta = float((gem5::curTick() - sendTick)) / 10.0e3;
+  float delta = float((gem5::curTick() - sendTick)) / 10.0e8;
   loadGeneratorPcapStats.latency.sample(delta);
   DPRINTF(LoadgenLatency, "Latency %f \n", delta);
   return true;

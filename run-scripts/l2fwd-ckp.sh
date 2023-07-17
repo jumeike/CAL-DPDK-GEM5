@@ -1,6 +1,16 @@
 #!/bin/bash
-
-CACHE_CONFIG="--caches --l2cache --l1i_size=32kB --l1d_size=32kB --l1d_assoc=8 --l2_size=1MB --l2_assoc=16"
+#wbWidth=4 causes error when you run
+CACHE_CONFIG="--caches --l2cache --l3cache --l3_size 16MB --l3_assoc 16 --ddio-enabled --l1i_size=64kB --l1i_assoc=4 \
+--l1d_size=64kB --l1d_assoc=4 --l2_size=1MB --l2_assoc=8 --cacheline_size=64" 
+CPU_CONFIG="--param=system.cpu[0:4].l2cache.mshrs=46 --param=system.cpu[0:4].dcache.mshrs=20 \
+  --param=system.cpu[0:4].icache.mshrs=20 --param=system.switch_cpus[0:4].decodeWidth=4 \
+  --param=system.switch_cpus[0:4].numROBEntries=128 --param=system.switch_cpus[0:4].numIQEntries=64 \
+  --param=system.switch_cpus[0:4].LQEntries=68 --param=system.switch_cpus[0:4].SQEntries=72 \
+  --param=system.switch_cpus[0:4].numPhysIntRegs=256 --param=system.switch_cpus[0:4].numPhysFloatRegs=256 \
+  --param=system.switch_cpus[0:4].branchPred.BTBEntries=8192 --param=system.switch_cpus[0:4].issueWidth=8 \
+  --param=system.switch_cpus[0:4].commitWidth=8 --param=system.switch_cpus[0:4].dispatchWidth=8 \
+  --param=system.switch_cpus[0:4].fetchWidth=8 --param=system.switch_cpus[0:4].wbWidth=8 \
+  --param=system.switch_cpus[0:4].squashWidth=8 --param=system.switch_cpus[0:4].renameWidth=8" \
 
 function usage {
   echo "Usage: $0 --num-nics <num_nics> [--script <script>] [--packet-rate <packet_rate>] [--packet-size <packet_size>] [--loadgen-find-bw] [--take-checkpoint] [-h|--help]"
@@ -23,7 +33,7 @@ function run_simulation {
   "$GEM5_DIR/build/ARM/gem5.$GEM5TYPE" $DEBUG_FLAGS --outdir="$RUNDIR" \
   "$GEM5_DIR"/configs/example/fs.py --cpu-type=$CPUTYPE \
   --kernel="$RESOURCES/vmlinux" --disk="$RESOURCES/rootfs.ext2" --bootloader="$RESOURCES/boot.arm64" --root=/dev/sda \
-  --num-cpus=2 --mem-size=8192MB --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
+  --num-cpus=$(($num_nics+3)) --mem-type=DDR4_2400_16x4 --mem-channels=4 --mem-size=65536MB --cpu-clock=3GHz --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
   --num-nics="$num_nics" --num-loadgens="$num_nics" \
   --checkpoint-dir="$CKPT_DIR" $CONFIGARGS
 }
@@ -86,21 +96,23 @@ while true; do
 done
 
 CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
-
+# CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC-dpdk-testpmd-touch.sh" # hack_back_ckpt.rcS"
 if [[ -z "$num_nics" ]]; then
   echo "Error: missing argument --num-nics" >&2
   usage
 fi
 
 if [[ -n "$checkpoint" ]]; then
-  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp"
+  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp"-$GUEST_SCRIPT
+  # RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-dpdk-touch-l2fwd.sh"
   setup_dirs
   echo "Taking Checkpoint for NICs=$num_nics" >&2
   GEM5TYPE="fast"
-  ## packet-size = 0 leads to segfault
+  # packet-size = 0 leads to segfault
   PACKET_SIZE=128
   CPUTYPE="AtomicSimpleCPU"
   CONFIGARGS="--max-checkpoints 2"
+  # CONFIGARGS="--max-checkpoints 1 -r 1"
   run_simulation
   exit 0
 else
@@ -113,15 +125,17 @@ else
     echo "Error: missing argument --packet_rate" >&2
     usage
   fi
-  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC"
-  setup_dirs
   ((RATE = PACKET_RATE * PACKET_SIZE * 8 / 1024 / 1024 / 1024))
+  RUNDIR=${GIT_ROOT}/rundir/dpdk-baseline-apps/$num_nics"NIC-"$PACKET_SIZE"SIZE-"$PACKET_RATE"RATE-"$RATE"Gbps-ddio-enabled"-$GUEST_SCRIPT
+  setup_dirs
+
   echo "Running NICs=$num_nics at $RATE GBPS" >&2
   CPUTYPE="DerivO3CPU"
   GEM5TYPE="opt"
   LOADGENMODE=${LOADGENMODE:-"Static"}
-  DEBUG_FLAGS="--debug-flags=LoadgenDebug"
-  CONFIGARGS="$CACHE_CONFIG -r 2 --loadgen-start=11538342830500 --rel-max-tick=300000000000 --packet-rate=$PACKET_RATE --packet-size=$PACKET_SIZE --loadgen-mode=$LOADGENMODE"
-  run_simulation
+  DEBUG_FLAGS="--debug-flags=LoadgenDebug" #--debug-start=3395283404348" #EthernetAll,EthernetDesc,LoadgenDebug
+  CONFIGARGS="$CACHE_CONFIG $CPU_CONFIG -r 2 --loadgen-start=17301784863700 --rel-max-tick=3000000000000 --packet-rate=$PACKET_RATE --packet-size=$PACKET_SIZE --loadgen-mode=$LOADGENMODE" \
+  # --warmup-dpdk 200000000000"
+  run_simulation > ${RUNDIR}/simout
   exit
 fi

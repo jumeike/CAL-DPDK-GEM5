@@ -95,5 +95,9 @@ CompoundFlag('EthernetAll', [ 'Ethernet', 'EthernetPIO', 'EthernetDMA',
 CompoundFlag('EthernetNoData', [ 'Ethernet', 'EthernetPIO', 'EthernetDesc',
     'EthernetIntr', 'EthernetSM', 'EthernetCksum' ])
 
+CompoundFlag('EthernetLoadgen', [ 'EthernetDpdk', 'LoadgenDebug', 
+    'LoadgenLatency' ])
+
 DebugFlag('LoadgenDebug')
 DebugFlag('LoadgenLatency')
+DebugFlag('EthernetDpdk')

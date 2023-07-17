@@ -51,6 +51,8 @@
 #include "params/IGbE.hh"
 #include "sim/stats.hh"
 #include "sim/system.hh"
+// Loadgen debug flag for DPDK
+#include "debug/EthernetDpdk.hh"
 
 namespace gem5
 {
@@ -922,6 +924,7 @@ IGbE::DescCache<T>::writeback1()
     }
 
     DPRINTF(EthernetDesc, "Begining DMA of %d descriptors\n", wbOut);
+    DPRINTF(EthernetDpdk, "Begining DMA of %d descriptors\n", wbOut);
 
     for (int x = 0; x < wbOut; x++) {
         assert(usedCache.size());
@@ -950,6 +953,9 @@ IGbE::DescCache<T>::fetchDescriptors()
         DPRINTF(EthernetDesc,
                 "Currently fetching %d descriptors, returning\n",
                 curFetching);
+        DPRINTF(EthernetDpdk,
+                "Currently fetching %d descriptors, returning\n",
+                curFetching);
         return;
     }
 
@@ -967,7 +973,10 @@ IGbE::DescCache<T>::fetchDescriptors()
             "%d len: %d cachePnt: %d max_to_fetch: %d descleft: %d\n",
             descHead(), descTail(), descLen(), cachePnt,
             max_to_fetch, descLeft());
-
+    DPRINTF(EthernetDpdk, "Fetching descriptors head: %d tail: "
+            "%d len: %d cachePnt: %d max_to_fetch: %d descleft: %d\n",
+            descHead(), descTail(), descLen(), cachePnt,
+            max_to_fetch, descLeft());
     // Nothing to do
     if (max_to_fetch == 0)
         return;
@@ -1208,6 +1217,8 @@ IGbE::RxDescCache::writePacket(EthPacketPtr packet, int pkt_offset)
         bytesCopied = packet->length;
         DPRINTF(EthernetDesc, "Packet Length: %d Desc Size: %d\n",
                 packet->length, igbe->regs.rctl.descSize());
+        DPRINTF(EthernetDpdk, "Packet Length: %d Desc Size: %d\n",
+                packet->length, igbe->regs.rctl.descSize());
         assert(packet->length < igbe->regs.rctl.descSize());
         igbe->dmaWrite(pciToDma(desc->legacy.buf),
                        packet->length, &pktEvent, packet->data,
@@ -1343,6 +1354,7 @@ IGbE::RxDescCache::pktComplete()
     assert(igbe->regs.rxcsum.pcss() == 0);
 
     DPRINTF(EthernetDesc, "Packet written to memory updating Descriptor\n");
+    DPRINTF(EthernetDpdk, "Packet written to memory updating Descriptor\n");
 
     uint16_t status = RXDS_DD;
     uint8_t err = 0;
@@ -1445,6 +1457,8 @@ IGbE::RxDescCache::pktComplete()
     if (bytesCopied == pktPtr->length) {
         DPRINTF(EthernetDesc,
                 "Packet completely written to descriptor buffers\n");
+        DPRINTF(EthernetDpdk,
+                "Packet completely written to descriptor buffers\n");    
         // Deal with the rx timer interrupts
         if (igbe->regs.rdtr.delay()) {
             Tick delay = igbe->regs.rdtr.delay() * igbe->intClock();
@@ -1483,6 +1497,7 @@ IGbE::RxDescCache::pktComplete()
     pktDone = true;
 
     DPRINTF(EthernetDesc, "Processing of this descriptor complete\n");
+    DPRINTF(EthernetDpdk, "Processing of this descriptor complete\n");
     unusedCache.pop_front();
     usedCache.push_back(desc);
 }
@@ -1663,7 +1678,7 @@ IGbE::TxDescCache::getPacketSize(EthPacketPtr p)
         return 0;
 
     DPRINTF(EthernetDesc, "Starting processing of descriptor\n");
-
+    DPRINTF(EthernetDpdk, "Starting processing of descriptor\n");
     assert(!useTso || tsoLoadedHeader);
     TxDesc *desc = unusedCache.front();
 
@@ -1753,6 +1768,7 @@ IGbE::TxDescCache::pktComplete()
     assert(pktPtr);
 
     DPRINTF(EthernetDesc, "DMA of packet complete\n");
+    DPRINTF(EthernetDpdk, "DMA of packet complete\n");
 
 
     desc = unusedCache.front();
@@ -1916,6 +1932,9 @@ IGbE::TxDescCache::pktComplete()
 
 
     DPRINTF(EthernetDesc,
+            "------Packet of %d bytes ready for transmission-------\n",
+            pktPtr->length);
+    DPRINTF(EthernetDpdk,
             "------Packet of %d bytes ready for transmission-------\n",
             pktPtr->length);
     pktDone = true;
@@ -2111,6 +2130,7 @@ IGbE::txStateMachine()
     if (!regs.tctl.en()) {
         txTick = false;
         DPRINTF(EthernetSM, "TXS: TX disabled, stopping ticking\n");
+        DPRINTF(EthernetDpdk, "TXS: TX disabled, stopping ticking\n");
         return;
     }
 
@@ -2120,6 +2140,7 @@ IGbE::txStateMachine()
     if (txPacket && txDescCache.packetAvailable()
         && !txDescCache.packetMultiDesc() && txPacket->length) {
         DPRINTF(EthernetSM, "TXS: packet placed in TX FIFO\n");
+        DPRINTF(EthernetDpdk, "TXS: packet placed in TX FIFO\n");
 #ifndef NDEBUG
         bool success =
 #endif
@@ -2149,6 +2170,8 @@ IGbE::txStateMachine()
             txDescCache.fetchDescriptors();
             DPRINTF(EthernetSM, "TXS: No descriptors left in ring, forcing "
                     "writeback stopping ticking and posting TXQE\n");
+            DPRINTF(EthernetDpdk, "TXS: No descriptors left in ring, forcing "
+                    "writeback stopping ticking and posting TXQE\n");
             txTick = false;
             return;
         }
@@ -2157,6 +2180,8 @@ IGbE::txStateMachine()
         if (!(txDescCache.descUnused())) {
             txDescCache.fetchDescriptors();
             DPRINTF(EthernetSM, "TXS: No descriptors available in cache, "
+                    "fetching and stopping ticking\n");
+            DPRINTF(EthernetDpdk, "TXS: No descriptors available in cache, "
                     "fetching and stopping ticking\n");
             txTick = false;
             return;
@@ -2167,6 +2192,8 @@ IGbE::txStateMachine()
         if (txDescCache.packetWaiting()) {
             DPRINTF(EthernetSM,
                     "TXS: Fetching TSO header, stopping ticking\n");
+            DPRINTF(EthernetDpdk,
+                    "TXS: Fetching TSO header, stopping ticking\n");
             txTick = false;
             return;
         }
@@ -2175,15 +2202,22 @@ IGbE::txStateMachine()
         if (size > 0 && txFifo.avail() > size) {
             DPRINTF(EthernetSM, "TXS: Reserving %d bytes in FIFO and "
                     "beginning DMA of next packet\n", size);
+            DPRINTF(EthernetDpdk, "TXS: Reserving %d bytes in FIFO and "
+                    "beginning DMA of next packet\n", size);
             txFifo.reserve(size);
             txDescCache.getPacketData(txPacket);
         } else if (size == 0) {
             DPRINTF(EthernetSM, "TXS: getPacketSize returned: %d\n", size);
             DPRINTF(EthernetSM,
                     "TXS: No packets to get, writing back used descriptors\n");
+            DPRINTF(EthernetDpdk, "TXS: getPacketSize returned: %d\n", size);
+            DPRINTF(EthernetDpdk,
+                    "TXS: No packets to get, writing back used descriptors\n");
             txDescCache.writeback(0);
         } else {
             DPRINTF(EthernetSM, "TXS: FIFO full, stopping ticking until space "
+                    "available in FIFO\n");
+            DPRINTF(EthernetDpdk, "TXS: FIFO full, stopping ticking until space "
                     "available in FIFO\n");
             txTick = false;
         }
@@ -2192,20 +2226,342 @@ IGbE::txStateMachine()
         return;
     }
     DPRINTF(EthernetSM, "TXS: Nothing to do, stopping ticking\n");
+    DPRINTF(EthernetDpdk, "TXS: Nothing to do, stopping ticking\n");
     txTick = false;
 }
+
+char currState = 'A', nextState;
+void
+IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
+{
+    // State Encoding: rxFifoFull,rxRingFull,txRingFull
+    // 000 -> "A" || 001 -> "B" || 010 -> "C" || 011 = "D"
+    // 100 -> "E" || 101 -> "F" || 110 -> "G" || 111 = "H"
+    
+    switch(currState) {
+        case 'A':
+            if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && !txRingFull){
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++;
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull){
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.unknownDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else
+                nextState = 'A';
+            break;
+        case 'B':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && rxRingFull && !txRingFull){
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++; //confirm-done
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull){
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++; //confirm-done
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            break;
+        case 'C':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++;
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull){
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }   
+            else {
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            break;
+        case 'D':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.txDrops++; //confirm-done
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull){
+                nextState = 'F';
+                etherDeviceStats.txDrops++; //confirm-done
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }   
+            else {
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            break;
+        case 'E':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull){
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull){
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }   
+            else{
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++;
+            }  
+            break;
+        case 'F':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull){
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }   
+            else{
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.txRingBufferFull++;
+            }  
+            break;
+        case 'G':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull){
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++;
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && txRingFull) {
+                nextState = 'H';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }   
+            else{
+                nextState = 'G';
+                etherDeviceStats.coreDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+            }  
+            break;
+        case 'H':
+            if(!rxFifoFull && !rxRingFull && !txRingFull)
+                nextState = 'A';
+            else if(!rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'B';
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && txRingFull){
+                nextState = 'D';
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(rxFifoFull && !rxRingFull && !txRingFull){
+                nextState = 'E';
+                etherDeviceStats.dmaDrops++;
+            }
+            else if(rxFifoFull && !rxRingFull && txRingFull) {
+                nextState = 'F';
+                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.txRingBufferFull++;
+            }
+            else if(!rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'C';
+                etherDeviceStats.rxRingBufferFull++;
+            }
+            else if(rxFifoFull && rxRingFull && !txRingFull) {
+                nextState = 'G';
+                etherDeviceStats.coreDrops++; //confirm-done
+                etherDeviceStats.rxRingBufferFull++;
+            }   
+            else{
+                nextState = 'H';
+                etherDeviceStats.txDrops++;
+                etherDeviceStats.rxRingBufferFull++;
+                etherDeviceStats.txRingBufferFull++;
+            }  
+            break;
+    }
+    currState = nextState;
+}
+
 
 bool
 IGbE::ethRxPkt(EthPacketPtr pkt)
 {
+    
     etherDeviceStats.rxBytes += pkt->length;
     etherDeviceStats.rxPackets++;
 
-    DPRINTF(Ethernet, "RxFIFO: Receiving pcakte from wire\n");
+    DPRINTF(Ethernet, "RxFIFO: Receiving packet from wire\n");
+    DPRINTF(EthernetDpdk, "RxFIFO: Receiving packet from wire\n");
+
+    // set rxFifoFull, txRingFull, rxRingFull
+    int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
+    int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
+    int rxFifoFull = (rxFifo.full() ? 1 : 0);
+    // int rxFifoFull = (!rxFifo.push(pkt) ? 1 : 0);
+    // call updateDropFSM(rxFifo.full(), txRingFull)
+    updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
 
 
     if (!regs.rctl.en()) {
         DPRINTF(Ethernet, "RxFIFO: RX not enabled, dropping\n");
+        DPRINTF(EthernetDpdk, "RxFIFO: RX not enabled, dropping\n");
         return true;
     }
 
@@ -2214,15 +2570,23 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
     if ((rxTick || txTick) && !tickEvent.scheduled()) {
         DPRINTF(EthernetSM,
                 "RXS: received packet into fifo, starting ticking\n");
+        DPRINTF(EthernetDpdk,
+                "RXS: received packet into fifo, starting ticking\n");
         restartClock();
     }
-
+    // int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
+    // int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
+    // int rxFifoFull;
     if (!rxFifo.push(pkt)) {
+        // rxFifoFull =1;
         DPRINTF(Ethernet, "RxFIFO: Packet won't fit in fifo... dropped\n");
+        DPRINTF(EthernetDpdk, "RxFIFO: Packet won't fit in fifo... dropped\n");
         postInterrupt(IT_RXO, true);
         return false;
     }
-
+    // else
+        // rxFifoFull=0;
+    // updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
     return true;
 }
 
@@ -2233,6 +2597,7 @@ IGbE::rxStateMachine()
     if (!regs.rctl.en()) {
         rxTick = false;
         DPRINTF(EthernetSM, "RXS: RX disabled, stopping ticking\n");
+        DPRINTF(EthernetDpdk, "RXS: RX disabled, stopping ticking\n");
         return;
     }
 
@@ -2240,14 +2605,19 @@ IGbE::rxStateMachine()
     if (rxDescCache.packetDone()) {
         rxDmaPacket = false;
         DPRINTF(EthernetSM, "RXS: Packet completed DMA to memory\n");
+        DPRINTF(EthernetDpdk, "RXS: Packet completed DMA to memory\n");
         int descLeft = rxDescCache.descLeft();
         DPRINTF(EthernetSM, "RXS: descLeft: %d rdmts: %d rdlen: %d\n",
+                descLeft, regs.rctl.rdmts(), regs.rdlen());
+        DPRINTF(EthernetDpdk, "RXS: descLeft: %d rdmts: %d rdlen: %d\n",
                 descLeft, regs.rctl.rdmts(), regs.rdlen());
 
         // rdmts 2->1/8, 1->1/4, 0->1/2
         int ratio = (1ULL << (regs.rctl.rdmts() + 1));
         if (descLeft * ratio <= regs.rdlen()) {
             DPRINTF(Ethernet, "RXS: Interrupting (RXDMT) "
+                    "because of descriptors left\n");
+            DPRINTF(EthernetDpdk, "RXS: Interrupting (RXDMT) "
                     "because of descriptors left\n");
             rxDescCache.writeback(0);
          }
@@ -2264,6 +2634,8 @@ IGbE::rxStateMachine()
             rxDescCache.writeback(0);
             DPRINTF(EthernetSM, "RXS: No descriptors left in ring, forcing"
                     " writeback and stopping ticking\n");
+            DPRINTF(EthernetDpdk, "RXS: No descriptors left in ring, forcing"
+                    " writeback and stopping ticking\n");
             rxTick = false;
         }
 
@@ -2272,6 +2644,8 @@ IGbE::rxStateMachine()
 
         if (regs.rxdctl.wthresh() >= rxDescCache.descUsed()) {
             DPRINTF(EthernetSM,
+                    "RXS: Writing back because WTHRESH >= descUsed\n");
+            DPRINTF(EthernetDpdk,
                     "RXS: Writing back because WTHRESH >= descUsed\n");
             if (regs.rxdctl.wthresh() < (cacheBlockSize()>>4))
                 rxDescCache.writeback(regs.rxdctl.wthresh()-1);
@@ -2284,12 +2658,16 @@ IGbE::rxStateMachine()
              regs.rxdctl.hthresh())) {
             DPRINTF(EthernetSM, "RXS: Fetching descriptors because "
                     "descUnused < PTHRESH\n");
+            DPRINTF(EthernetDpdk, "RXS: Fetching descriptors because "
+                    "descUnused < PTHRESH\n");
             rxDescCache.fetchDescriptors();
         }
 
         if (rxDescCache.descUnused() == 0) {
             rxDescCache.fetchDescriptors();
             DPRINTF(EthernetSM, "RXS: No descriptors available in cache, "
+                    "fetching descriptors and stopping ticking\n");
+            DPRINTF(EthernetDpdk, "RXS: No descriptors available in cache, "
                     "fetching descriptors and stopping ticking\n");
             rxTick = false;
         }
@@ -2299,6 +2677,8 @@ IGbE::rxStateMachine()
     if (rxDmaPacket) {
         DPRINTF(EthernetSM,
                 "RXS: stopping ticking until packet DMA completes\n");
+        DPRINTF(EthernetDpdk,
+                "RXS: stopping ticking until packet DMA completes\n");
         rxTick = false;
         return;
     }
@@ -2307,13 +2687,17 @@ IGbE::rxStateMachine()
         rxDescCache.fetchDescriptors();
         DPRINTF(EthernetSM, "RXS: No descriptors available in cache, "
                 "stopping ticking\n");
+        DPRINTF(EthernetDpdk, "RXS: No descriptors available in cache, "
+                "stopping ticking\n");
         rxTick = false;
         DPRINTF(EthernetSM, "RXS: No descriptors available, fetching\n");
+        DPRINTF(EthernetDpdk, "RXS: No descriptors available, fetching\n");
         return;
     }
 
     if (rxFifo.empty()) {
         DPRINTF(EthernetSM, "RXS: RxFIFO empty, stopping ticking\n");
+        DPRINTF(EthernetDpdk, "RXS: RxFIFO empty, stopping ticking\n");
         rxTick = false;
         return;
     }
@@ -2324,13 +2708,16 @@ IGbE::rxStateMachine()
 
     pktOffset = rxDescCache.writePacket(pkt, pktOffset);
     DPRINTF(EthernetSM, "RXS: Writing packet into memory\n");
+    DPRINTF(EthernetDpdk, "RXS: Writing packet into memory\n");
     if (pktOffset == pkt->length) {
         DPRINTF(EthernetSM, "RXS: Removing packet from FIFO\n");
+        DPRINTF(EthernetDpdk, "RXS: Removing packet from FIFO\n");
         pktOffset = 0;
         rxFifo.pop();
     }
 
     DPRINTF(EthernetSM, "RXS: stopping ticking until packet DMA completes\n");
+    DPRINTF(EthernetDpdk, "RXS: stopping ticking until packet DMA completes\n");
     rxTick = false;
     rxDmaPacket = true;
 }
@@ -2356,6 +2743,9 @@ IGbE::txWire()
         DPRINTF(EthernetSM,
                 "TxFIFO: Successful transmit, bytes available in fifo: %d\n",
                 txFifo.avail());
+        DPRINTF(EthernetDpdk,
+                "TxFIFO: Successful transmit, bytes available in fifo: %d\n",
+                txFifo.avail());
 
         etherDeviceStats.txBytes += txFifo.front()->length;
         etherDeviceStats.txPackets++;
@@ -2368,7 +2758,7 @@ void
 IGbE::tick()
 {
     DPRINTF(EthernetSM, "IGbE: -------------- Cycle --------------\n");
-
+    DPRINTF(EthernetDpdk, "IGbE: -------------- Cycle --------------\n");
     inTick = true;
 
     if (rxTick)

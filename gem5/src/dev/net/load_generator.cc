@@ -147,7 +147,7 @@ namespace gem5
         lastRxCount++;
 
         uint64_t sendTick;
-        memcpy(&sendTick, &(pkt->data[8]), sizeof(uint64_t));
+        memcpy(&sendTick, &(pkt->data[MACHeaderSize]), sizeof(uint64_t));
         
         float delta = float((gem5::curTick() - sendTick))/10.0e3;
         loadGeneratorStats.latency.sample(delta);
