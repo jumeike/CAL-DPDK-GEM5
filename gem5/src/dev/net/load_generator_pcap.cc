@@ -14,7 +14,7 @@
 
 static constexpr size_t kLatencyHistSize = 100;
 static constexpr unsigned kEtherHeaderSize = 14;
-static constexpr unsigned kCheckLossInteval = 1000;
+static constexpr unsigned kCheckLossInteval = 10;
 static constexpr size_t kLossCheckWaitCycles = 100000000;
 static constexpr uint16_t checkLossInterval = 1000;
 
