@@ -44,7 +44,8 @@ if [[ -z "${GIT_ROOT}" ]]; then
 fi
 
 GEM5_DIR=${GIT_ROOT}/gem5
-RESOURCES=${GIT_ROOT}/resources
+# RESOURCES=${GIT_ROOT}/resources
+RESOURCES=${GIT_ROOT}/resources-dpdk
 GUEST_SCRIPT_DIR=${GIT_ROOT}/guest-scripts
 
 # parse command line arguments
@@ -95,24 +96,24 @@ while true; do
   esac
 done
 
-CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
-# CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC-dpdk-testpmd-touch.sh" # hack_back_ckpt.rcS"
+# CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
+CKPT_DIR=${GIT_ROOT}/ckpts/ckpts-with-new-vmlinux/$num_nics"NIC"-$GUEST_SCRIPT
 if [[ -z "$num_nics" ]]; then
   echo "Error: missing argument --num-nics" >&2
   usage
 fi
 
 if [[ -n "$checkpoint" ]]; then
-  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp"-$GUEST_SCRIPT
-  # RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-dpdk-touch-l2fwd.sh"
+  # RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp"-$GUEST_SCRIPT
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/$num_nics"NIC-ckp"-$GUEST_SCRIPT
   setup_dirs
   echo "Taking Checkpoint for NICs=$num_nics" >&2
   GEM5TYPE="fast"
   # packet-size = 0 leads to segfault
   PACKET_SIZE=128
   CPUTYPE="AtomicSimpleCPU"
-  CONFIGARGS="--max-checkpoints 2"
-  # CONFIGARGS="--max-checkpoints 1 -r 1"
+  # CONFIGARGS="--max-checkpoints 2"
+  CONFIGARGS="--max-checkpoints 1 -r 1"
   run_simulation
   exit 0
 else
@@ -126,7 +127,7 @@ else
     usage
   fi
   ((RATE = PACKET_RATE * PACKET_SIZE * 8 / 1024 / 1024 / 1024))
-  RUNDIR=${GIT_ROOT}/rundir/dpdk-baseline-apps/$num_nics"NIC-"$PACKET_SIZE"SIZE-"$PACKET_RATE"RATE-"$RATE"Gbps-ddio-enabled"-$GUEST_SCRIPT
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/fixed/$num_nics"NIC-"$PACKET_SIZE"SIZE-"$PACKET_RATE"RATE-"$RATE"Gbps-ddio-enabled"-$GUEST_SCRIPT
   setup_dirs
 
   echo "Running NICs=$num_nics at $RATE GBPS" >&2
@@ -134,8 +135,14 @@ else
   GEM5TYPE="opt"
   LOADGENMODE=${LOADGENMODE:-"Static"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug" #--debug-start=3395283404348" #EthernetAll,EthernetDesc,LoadgenDebug
-  CONFIGARGS="$CACHE_CONFIG $CPU_CONFIG -r 2 --loadgen-start=17332636147300 --rel-max-tick=3000000000000 --packet-rate=$PACKET_RATE --packet-size=$PACKET_SIZE --loadgen-mode=$LOADGENMODE" \
+  CONFIGARGS="$CACHE_CONFIG $CPU_CONFIG -r 2 --loadgen-start=4747082597245 --rel-max-tick=1000000000000 --packet-rate=$PACKET_RATE --packet-size=$PACKET_SIZE --loadgen-mode=$LOADGENMODE" \
   # --warmup-dpdk 200000000000"
   run_simulation > ${RUNDIR}/simout
   exit
 fi
+#26292414940003 - testpmd
+#26292402742869 - testpmd-touchfwd
+#26296403413194 - testpmd-touchdrop
+#8715117583908  - l2fwd
+#25098506526510 - l2fwd-touchdrop
+#4747072597245  - l2fwd-touchfwd

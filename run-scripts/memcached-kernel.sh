@@ -42,7 +42,8 @@ if [[ -z "${GIT_ROOT}" ]]; then
 fi
 
 GEM5_DIR=${GIT_ROOT}/gem5
-RESOURCES=${GIT_ROOT}/resources
+# RESOURCES=${GIT_ROOT}/resources
+RESOURCES=${GIT_ROOT}/resources-dpdk
 GUEST_SCRIPT_DIR=${GIT_ROOT}/guest-scripts
 
 # parse command line arguments
@@ -96,15 +97,16 @@ while true; do
   *) break ;;
   esac
 done
-CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
-
+# CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
+CKPT_DIR=${GIT_ROOT}/ckpts/ckpts-with-new-vmlinux/$num_nics"NIC"-$GUEST_SCRIPT
 if [[ -z "$num_nics" ]]; then
   echo "Error: missing argument --num-nics" >&2
   usage
 fi
 
 if [[ -n "$checkpoint" ]]; then
-  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-"$GUEST_SCRIPT
+  # RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-"$GUEST_SCRIPT
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/$num_nics"NIC-ckp"-$GUEST_SCRIPT
   setup_dirs
   echo "Taking Checkpoint for NICs=$num_nics" >&2
   GEM5TYPE="fast"
@@ -114,7 +116,7 @@ if [[ -n "$checkpoint" ]]; then
   PACKET_RATE=1000
   LOADGENREPLAYMODE=ConstThroughput
   PCAP_FILENAME="../resources/warmup_trace.pcap"
-  CONFIGARGS="--max-checkpoints 2 --checkpoint-at-end --loadgen-start=1304696637500 -m 20619488205000 --loadgen-type=Pcap --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
+  CONFIGARGS="--max-checkpoints 2 --checkpoint-at-end --cpu-clock=$FREQ --loadgen-start=1326735814500 -m 20619488205000 --loadgen-type=Pcap --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
   run_simulation
   exit 0
 else

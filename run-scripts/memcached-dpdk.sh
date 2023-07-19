@@ -42,11 +42,12 @@ if [[ -z "${GIT_ROOT}" ]]; then
 fi
 
 GEM5_DIR=${GIT_ROOT}/gem5
-RESOURCES=${GIT_ROOT}/resources
+# RESOURCES=${GIT_ROOT}/resources
+RESOURCES=${GIT_ROOT}/resources-dpdk
 GUEST_SCRIPT_DIR=${GIT_ROOT}/guest-scripts
 
 # parse command line arguments
-TEMP=$(getopt -o 'h' --long take-checkpoint,num-nics:,script:,packet-rate,loadgen-find-bw,help -n 'dpdk-loadgen' -- "$@")
+TEMP=$(getopt -o 'h' --long freq:,take-checkpoint,num-nics:,script:,packet-rate,loadgen-find-bw,help -n 'dpdk-loadgen' -- "$@")
 
 # check for parsing errors
 if [ $? != 0 ]; then
@@ -60,6 +61,10 @@ while true; do
   case "$1" in
   --num-nics)
     num_nics="$2"
+    shift 2
+    ;;
+  --freq)
+    FREQ="$2"
     shift 2
     ;;
   --take-checkpoint)
@@ -89,15 +94,16 @@ while true; do
   esac
 done
 
-CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
-
+# CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
+CKPT_DIR=${GIT_ROOT}/ckpts/ckpts-with-new-vmlinux/$num_nics"NIC"-$GUEST_SCRIPT
 if [[ -z "$num_nics" ]]; then
   echo "Error: missing argument --num-nics" >&2
   usage
 fi
 
 if [[ -n "$checkpoint" ]]; then
-  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-"$GUEST_SCRIPT
+  # RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-"$GUEST_SCRIPT
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/$num_nics"NIC-ckp"-$GUEST_SCRIPT
   setup_dirs
   echo "Taking Checkpoint for NICs=$num_nics" >&2
   GEM5TYPE="fast"
@@ -106,8 +112,8 @@ if [[ -n "$checkpoint" ]]; then
   CPUTYPE="AtomicSimpleCPU"
   PACKET_RATE=1000
   LOADGENREPLAYMODE=ConstThroughput
-  PCAP_FILENAME="../resources/warmup-dpdk.pcap"
-  CONFIGARGS="--max-checkpoints 3 --checkpoint-at-end --loadgen-start=13015607472500 -m 20619488205000 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
+  PCAP_FILENAME="../resources-dpdk/warmup-dpdk.pcap"
+  CONFIGARGS="-r 2 --max-checkpoints 1 --checkpoint-at-end --cpu-clock=$FREQ --loadgen-start=5747697167051 -m 8747697167051 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
   run_simulation
   exit 0
 else
@@ -116,16 +122,17 @@ else
     usage
   fi
   PORT=11211
-  PCAP_FILENAME="../resources/request-dpdk.pcap"
+  PCAP_FILENAME="../resources-dpdk/request-dpdk.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10)) 
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
-  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE"-AtomicCPU"
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/O3CPU/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE"-3s"
   setup_dirs
-  CPUTYPE="AtomicSimpleCPU" # just because DerivO3CPU is too slow sometimes
+  CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
   # LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug"
-  CONFIGARGS="$CACHE_CONFIG -r 3 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=20619588205000 --rel-max-tick=3000000000000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-increment-interva=$INCR_INTERVAL --loadgen-port-filter=$PORT"
+  CONFIGARGS="$CACHE_CONFIG -r 3 --cpu-clock=$FREQ --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=8747698167051 --rel-max-tick=3000000000000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-increment-interva=$INCR_INTERVAL --loadgen-port-filter=$PORT"
   run_simulation > ${RUNDIR}/simout
   exit
 fi
+#5747697167051 - ckpt #2
