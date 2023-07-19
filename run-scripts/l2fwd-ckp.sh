@@ -134,7 +134,7 @@ else
   GEM5TYPE="opt"
   LOADGENMODE=${LOADGENMODE:-"Static"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug" #--debug-start=3395283404348" #EthernetAll,EthernetDesc,LoadgenDebug
-  CONFIGARGS="$CACHE_CONFIG $CPU_CONFIG -r 2 --loadgen-start=17301784863700 --rel-max-tick=3000000000000 --packet-rate=$PACKET_RATE --packet-size=$PACKET_SIZE --loadgen-mode=$LOADGENMODE" \
+  CONFIGARGS="$CACHE_CONFIG $CPU_CONFIG -r 2 --loadgen-start=17332636147300 --rel-max-tick=3000000000000 --packet-rate=$PACKET_RATE --packet-size=$PACKET_SIZE --loadgen-mode=$LOADGENMODE" \
   # --warmup-dpdk 200000000000"
   run_simulation > ${RUNDIR}/simout
   exit

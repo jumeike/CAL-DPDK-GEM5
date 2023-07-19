@@ -5,6 +5,7 @@ CACHE_CONFIG="--caches --l2cache --l3cache --l3_size 4MB --l3_assoc 16 --l1i_siz
 CPU_CONFIG="--param=system.cpu[0:2].l2cache.mshrs=46 --param=system.cpu[0:2].dcache.mshrs=20 \
   --param=system.cpu[0:2].icache.mshrs=20 --param=system.switch_cpus[0:2].decodeWidth=4 \
   --param=system.switch_cpus[0:2].numROBEntries=128 --param=system.switch_cpus[0:2].numIQEntries=64 \
+  --param=system.switch_cpus[0:4].LQEntries=68 --param=system.switch_cpus[0:4].SQEntries=72 \
   --param=system.switch_cpus[0:2].numPhysIntRegs=256 --param=system.switch_cpus[0:2].numPhysFloatRegs=256 \
   --param=system.switch_cpus[0:2].branchPred.BTBEntries=8192 --param=system.switch_cpus[0:2].issueWidth=8 \
   --param=system.switch_cpus[0:2].commitWidth=8 --param=system.switch_cpus[0:2].dispatchWidth=8 \
@@ -88,7 +89,7 @@ while true; do
   esac
 done
 
-CKPT_DIR=${GIT_ROOT}/ckpts/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
+CKPT_DIR=${GIT_ROOT}/ckpts/$num_nics"NIC"-$GUEST_SCRIPT
 
 if [[ -z "$num_nics" ]]; then
   echo "Error: missing argument --num-nics" >&2
@@ -118,9 +119,9 @@ else
   PCAP_FILENAME="../resources/request-dpdk.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10)) 
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
-  RUNDIR=${GIT_ROOT}/rundir/memcached-dpdk-test/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE"TimingCPU-3s"
+  RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE"-AtomicCPU"
   setup_dirs
-  CPUTYPE="TimingSimpleCPU" # just because DerivO3CPU is too slow sometimes
+  CPUTYPE="AtomicSimpleCPU" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
   # LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug"
