@@ -128,11 +128,11 @@ else
   PORT=11211    # for memcached
   PCAP_FILENAME="../resources/request_trace.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10))
-  RUNDIR=${GIT_ROOT}/rundir/request_trace-test-memcached_kernel_newkernel/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-disabled"
+  RUNDIR=${GIT_ROOT}/rundir/request_trace-test-memcached_kernel_newkernel1/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-disabled"
   setup_dirs
   CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
-  LOADGENREPLAYMODE=ConstThroughput
+  LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug"
   CONFIGARGS="--l2_size=$L2_SIZE --cpu-clock=$FREQ $CACHE_CONFIG -r 2 --loadgen-type=Pcap --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=20619488205000 -m=23619488205000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT --loadgen-increment-interva=$INCR_INTERVAL"
   run_simulation > ${RUNDIR}/simout

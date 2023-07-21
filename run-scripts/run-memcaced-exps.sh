@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 ## list of packet rates to test
-rates=(5000 10000 20000 30000 40000)
+rates=(5000 10000 20000)
 ##l2 sizes
 l2_sizes=(256kB 512kB 4MB 8MB)
 ## frequencies

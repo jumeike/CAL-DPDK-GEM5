@@ -125,7 +125,7 @@ else
   PCAP_FILENAME="../resources-dpdk/request-dpdk.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10)) 
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
-  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/O3CPU/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE"-3s"
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/O3CPU-newtracefile/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE"-noprint"
   setup_dirs
   CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"

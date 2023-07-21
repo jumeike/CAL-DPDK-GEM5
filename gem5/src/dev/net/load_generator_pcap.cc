@@ -14,9 +14,9 @@
 
 static constexpr size_t kLatencyHistSize = 100;
 static constexpr unsigned kEtherHeaderSize = 14;
-static constexpr unsigned kCheckLossInteval = 10;
+static constexpr unsigned kCheckLossInterval = 100;
 static constexpr size_t kLossCheckWaitCycles = 100000000;
-static constexpr uint16_t checkLossInterval = 1000;
+static constexpr uint16_t CheckLossInterval = 1000;
 
 namespace gem5 {
 LoadGeneratorPcap::LoadGeneratorPcapStats::LoadGeneratorPcapStats(
@@ -143,7 +143,7 @@ void LoadGeneratorPcap::buildEthernetHeader(EthPacketPtr ethpacket) const {
 }
 
 void LoadGeneratorPcap::sendPacket() {
-  DPRINTF(LoadgenDebug, "LoadGenPcap::sendPacket executed\n");
+  // DPRINTF(LoadgenDebug, "LoadGenPcap::sendPacket executed\n");
 
   // Read a packet from pcap file.
   pcap_pkthdr *pcap_header;
@@ -214,7 +214,7 @@ void LoadGeneratorPcap::sendPacket() {
     pcap_data += (iph->ip_hl << 2);
     const udphdr *udp = reinterpret_cast<const udphdr *>(pcap_data);
     if (ntohs(udp->uh_dport) != portFilter) {
-      DPRINTF(LoadgenDebug, "Packet was filter-out by port...\n");
+      // DPRINTF(LoadgenDebug, "Packet was filter-out by port...\n");
       schedule(sendPacketEvent, curTick() + 1);
       return;
     }
@@ -242,13 +242,19 @@ void LoadGeneratorPcap::sendPacket() {
 
   // Send packet.
   interface->sendPacket(txPacket);
-  DPRINTF(LoadgenDebug, "Packet was sent!\n");
+  // DPRINTF(LoadgenDebug, "Packet was sent!\n");
+
+  Tick currentTick = curTick();
+  packetSendTimes.push(currentTick);
+  // Increment stats.
+  loadGeneratorPcapStats.sentPackets++;
+  lastTxCount++;
 
   if (curTick() < stopTick) {
     if (replayMode == ReplayMode::ConstThroughput) {
       schedule(sendPacketEvent, curTick() + pckt_freq());
     } else if (replayMode == ReplayMode::ReplayAndAdjustThroughput) {
-      if (lastTxCount == kCheckLossInteval) {
+      if (lastTxCount == kCheckLossInterval) {
         schedule(checkLossEvent, curTick() + kLossCheckWaitCycles);
       } else {
         schedule(sendPacketEvent, curTick() + pckt_freq());
@@ -259,16 +265,16 @@ void LoadGeneratorPcap::sendPacket() {
     }
   }
 
-  Tick currentTick = curTick();
-  packetSendTimes.push(currentTick);
-  // Increment stats.
-  loadGeneratorPcapStats.sentPackets++;
-  lastTxCount++;
+  // Tick currentTick = curTick();
+  // packetSendTimes.push(currentTick);
+  // // Increment stats.
+  // loadGeneratorPcapStats.sentPackets++;
+  // lastTxCount++;
   return;
 }
 
 void LoadGeneratorPcap::checkLoss() {
-  if (lastTxCount - lastRxCount < 10) {
+  if (lastTxCount - lastRxCount < 5) {
     // No loss - incrrement packet rate.
     packetRate = packetRate + incrementInterval;
     schedule(sendPacketEvent, curTick() + pckt_freq());

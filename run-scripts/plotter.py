@@ -34,7 +34,7 @@ experiments = collect_experiments(path_to_stats)
 print('Found {} experiments'.format(len(experiments)))
 
 
-PACKET_RATE = 10000
+PACKET_RATE = 20000
 L2_EXPS = [x for x in experiments if '3GHz' in x and str(PACKET_RATE) in x]
 FREQ_EXPS = [x for x in experiments if '1MB' in x and str(PACKET_RATE) in x]
 
