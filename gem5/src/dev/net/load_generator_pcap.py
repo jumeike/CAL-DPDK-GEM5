@@ -10,7 +10,7 @@ class LoadGeneratorPcap(SimObject):
 
     interface = EtherInt("interface")
     loadgen_id = Param.Int(0, "For match NIC")
-    start_tick =  Param.Tick(1,"Tick at whcih to start loadgenerator")
+    start_tick =  Param.Tick(1,"Tick at which to start loadgenerator")
     stop_tick = Param.Tick(1, "Tick at which to stop loadgenerator")
     pcap_filename = Param.String("", "Filename of the pcap file")
     max_packetsize = Param.Int(1500, "To cut large packets")

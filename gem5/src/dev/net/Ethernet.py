@@ -160,11 +160,11 @@ class IGbE(EtherDevice):
 
     hardware_address = Param.EthernetAddr(NextEthernetAddr,
         "Ethernet Hardware Address")
-    rx_fifo_size = Param.MemorySize('2048KiB', "Size of the rx FIFO")
-    tx_fifo_size = Param.MemorySize('2048KiB', "Size of the tx FIFO")
-    rx_desc_cache_size = Param.Int(128,
+    rx_fifo_size = Param.MemorySize('4096KiB', "Size of the rx FIFO")
+    tx_fifo_size = Param.MemorySize('4096KiB', "Size of the tx FIFO")
+    rx_desc_cache_size = Param.Int(2048,
         "Number of enteries in the rx descriptor cache")
-    tx_desc_cache_size = Param.Int(128,
+    tx_desc_cache_size = Param.Int(2048,
         "Number of enteries in the rx descriptor cache")
     VendorID = 0x8086
     SubsystemID = 0x1008

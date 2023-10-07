@@ -63,13 +63,13 @@ class LoadGeneratorPcap : public SimObject {
   // Scheduling event callbacks.
   void sendPacket();
   void checkLoss();
-
+  Tick frequency();
   void endTest() const;
 
   // Incapsulate packet into Ethernet frame.
   void buildEthernetHeader(EthPacketPtr ethpacket) const;
 
-  inline Tick pckt_freq() const { return 1e12 / packetRate; }
+  // inline Tick pckt_freq() const { return 1e12 / packetRate; }
 
  public:
   LoadGeneratorPcap(const LoadGeneratorPcapParams &p);

@@ -98,7 +98,10 @@ LoadGeneratorPcap::~LoadGeneratorPcap() {
   if (pcap_h != nullptr) 
     pcap_close(pcap_h);
 }
-
+Tick LoadGeneratorPcap::frequency()
+    {
+        return (1e12/packetRate);
+    }
 void LoadGeneratorPcap::startup() {
   if (curTick() > stopTick) 
     return;
@@ -123,9 +126,13 @@ void LoadGeneratorPcap::buildEthernetHeader(EthPacketPtr ethpacket) const {
       0x00, 0x90,
       0x00, 0x00,
       0x00, static_cast<uint8_t>(0x01 + loadgenId)};  // Use paired NIC's MAC
+  // uint8_t dst_mac[6] = {
+      // 0x08, 0xc0,
+      // 0xeb, 0xbf,
+      // 0xee, static_cast<uint8_t>(0xb6 + loadgenId)};  // Use paired NIC's MAC
   uint8_t src_mac[6] = {0x00, 0x80, 0x00,
                         0x00, 0x00, static_cast<uint8_t>(0x01 + loadgenId)};
-
+// 08:c0:eb:bf:ee:aa
   uint16_t size = ethpacket->length;
 
   if (1 != htons(1)) 
@@ -143,7 +150,7 @@ void LoadGeneratorPcap::buildEthernetHeader(EthPacketPtr ethpacket) const {
 }
 
 void LoadGeneratorPcap::sendPacket() {
-  // DPRINTF(LoadgenDebug, "LoadGenPcap::sendPacket executed\n");
+  DPRINTF(LoadgenDebug, "LoadGenPcap::sendPacket executed\n");
 
   // Read a packet from pcap file.
   pcap_pkthdr *pcap_header;
@@ -155,7 +162,7 @@ void LoadGeneratorPcap::sendPacket() {
       DPRINTF(LoadgenDebug, "End of pcap trace is reached!\n");
       DPRINTF(LoadgenDebug, "Nothing will be scheduled in the loadgen, exiting here.\n");
       DPRINTF(LoadgenDebug, "Bye!\n");
-      // exitSimLoop("END OF PCAP TRACE" "SIM TERMINATED BY LOADGEN"); 
+      exitSimLoop("END OF PCAP TRACE" "\nSIM TERMINATED BY LOADGEN"); 
       // schedule(checkLossEvent, curTick() + kLossCheckWaitCycles);
       return;
       // TODO: can start over...
@@ -214,7 +221,7 @@ void LoadGeneratorPcap::sendPacket() {
     pcap_data += (iph->ip_hl << 2);
     const udphdr *udp = reinterpret_cast<const udphdr *>(pcap_data);
     if (ntohs(udp->uh_dport) != portFilter) {
-      // DPRINTF(LoadgenDebug, "Packet was filter-out by port...\n");
+      DPRINTF(LoadgenDebug, "Packet was filter-out by port...\n");
       schedule(sendPacketEvent, curTick() + 1);
       return;
     }
@@ -229,11 +236,13 @@ void LoadGeneratorPcap::sendPacket() {
 
     // Merge with our own Ethernet header.
     assert(pcap_header->len == ntohs(iph->ip_len) + kEtherHeaderSize);
+    // DPRINTF(LoadgenDebug, "Pcap header len size is %d\n", pcap_header->len);
     buildEthernetHeader(txPacket);
     // Copy our payload.
     memcpy(txPacket->data + kEtherHeaderSize, iph, ntohs(iph->ip_len));
   } else {
     // For DPDK stack, just change the Ethernet header and copy the rest.
+    // DPRINTF(LoadgenDebug, "Pcap header len size is %d\n", pcap_header->len);
     buildEthernetHeader(txPacket);
     pcap_data += sizeof(ether_header);
     memcpy(txPacket->data + kEtherHeaderSize, pcap_data,
@@ -242,7 +251,7 @@ void LoadGeneratorPcap::sendPacket() {
 
   // Send packet.
   interface->sendPacket(txPacket);
-  // DPRINTF(LoadgenDebug, "Packet was sent!\n");
+  DPRINTF(LoadgenDebug, "Packet was sent!\n");
 
   Tick currentTick = curTick();
   packetSendTimes.push(currentTick);
@@ -252,12 +261,12 @@ void LoadGeneratorPcap::sendPacket() {
 
   if (curTick() < stopTick) {
     if (replayMode == ReplayMode::ConstThroughput) {
-      schedule(sendPacketEvent, curTick() + pckt_freq());
+      schedule(sendPacketEvent, curTick() + frequency());
     } else if (replayMode == ReplayMode::ReplayAndAdjustThroughput) {
       if (lastTxCount == kCheckLossInterval) {
         schedule(checkLossEvent, curTick() + kLossCheckWaitCycles);
       } else {
-        schedule(sendPacketEvent, curTick() + pckt_freq());
+        schedule(sendPacketEvent, curTick() + frequency());
       }
     } else {
       warn("Weird replay mode detected, nothing will be scheduled next!");
@@ -277,7 +286,7 @@ void LoadGeneratorPcap::checkLoss() {
   if (lastTxCount - lastRxCount < 5) {
     // No loss - incrrement packet rate.
     packetRate = packetRate + incrementInterval;
-    schedule(sendPacketEvent, curTick() + pckt_freq());
+    schedule(sendPacketEvent, curTick() + frequency());
     DPRINTF(LoadgenDebug, "Rate Incremented, now sending packets at %u \n",
             packetRate);
     DPRINTF(LoadgenDebug, "Rx %lu, Tx %lu \n", lastRxCount, lastTxCount);
@@ -285,12 +294,16 @@ void LoadGeneratorPcap::checkLoss() {
     // Loss deteceted - dectement rate.
     if ((packetRate - incrementInterval) < packetRate)
       packetRate = packetRate - incrementInterval;
+    
 
     // add extra delay to prevent previouse loss from affecting results
-    schedule(sendPacketEvent, curTick() + pckt_freq() + kLossCheckWaitCycles);
+    schedule(sendPacketEvent, curTick() + frequency() + kLossCheckWaitCycles);
     DPRINTF(LoadgenDebug, "Loss Detected, now sending packets at %u \n ",
             packetRate);
     DPRINTF(LoadgenDebug, "Rx %lu, Tx %lu \n", lastRxCount, lastTxCount);
+    // exitSimLoop("LOSS DETECTED" "SIM TERMINATED BY LOADGEN");
+    // if (packetRate==0)
+    //   exitSimLoop("PACKET RATE DROPPED TO ZERO" "SIM TERMINATED BY LOADGEN");
   }
 
   lastTxCount = 0;
@@ -309,6 +322,8 @@ bool LoadGeneratorPcap::processRxPkt(EthPacketPtr pkt) {
   uint64_t sendTick = packetSendTimes.front();
   if (packetSendTimes.size() > 0)
     packetSendTimes.pop();
+  // uint64_t sendTick;
+  // memcpy(&sendTick, &(pkt->data[8]), sizeof(uint64_t));
   float delta = float((gem5::curTick() - sendTick)) / 10.0e8;
   loadGeneratorPcapStats.latency.sample(delta);
   DPRINTF(LoadgenLatency, "Latency %f \n", delta);

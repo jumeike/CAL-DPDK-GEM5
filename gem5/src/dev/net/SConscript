@@ -90,7 +90,7 @@ SimObject('load_generator_pcap.py')
 
 CompoundFlag('EthernetAll', [ 'Ethernet', 'EthernetPIO', 'EthernetDMA',
     'EthernetData' , 'EthernetDesc', 'EthernetIntr', 'EthernetSM',
-    'EthernetCksum', 'EthernetEEPROM' ])
+    'EthernetCksum', 'EthernetEEPROM', 'LoadgenDebug', 'LoadgenLatency' ])
 
 CompoundFlag('EthernetNoData', [ 'Ethernet', 'EthernetPIO', 'EthernetDesc',
     'EthernetIntr', 'EthernetSM', 'EthernetCksum' ])
