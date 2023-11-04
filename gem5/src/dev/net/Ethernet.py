@@ -60,9 +60,9 @@ class EtherLink(SimObject):
 
     int0 = EtherInt("interface 0")
     int1 = EtherInt("interface 1")
-    delay = Param.Latency('0us', "packet transmit delay")
-    delay_var = Param.Latency('0ns', "packet transmit delay variability")
-    speed = Param.NetworkBandwidth('1Gbps', "link speed")
+    delay = Param.Latency('200us', "packet transmit delay")
+    delay_var = Param.Latency('10ns', "packet transmit delay variability")
+    speed = Param.NetworkBandwidth('100Gbps', "link speed")
     dump = Param.EtherDump(NULL, "dump object")
 
 class DistEtherLink(SimObject):
@@ -162,9 +162,9 @@ class IGbE(EtherDevice):
         "Ethernet Hardware Address")
     rx_fifo_size = Param.MemorySize('4096KiB', "Size of the rx FIFO")
     tx_fifo_size = Param.MemorySize('4096KiB', "Size of the tx FIFO")
-    rx_desc_cache_size = Param.Int(2048,
+    rx_desc_cache_size = Param.Int(64,
         "Number of enteries in the rx descriptor cache")
-    tx_desc_cache_size = Param.Int(2048,
+    tx_desc_cache_size = Param.Int(64,
         "Number of enteries in the rx descriptor cache")
     VendorID = 0x8086
     SubsystemID = 0x1008

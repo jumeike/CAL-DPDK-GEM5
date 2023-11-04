@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 ## list of packet rates to test
-rates=(5000 10000 20000)
+rates=(10000)
 ##l2 sizes
 l2_sizes=(256kB 512kB 4MB 8MB)
 ## frequencies
@@ -12,14 +12,14 @@ for rate in "${rates[@]}"; do
     ## loop over all frequencies
     for f in "${freq[@]}"; do
       ## run the experiment
-      ./memcached-kernel.sh --num-nics 1 --script memcached_kernel.sh --packet-rate $rate --l2-size 1MB --freq $f &
+      ./memcached-kernel.sh --loadgen-find-bw --num-nics 1 --script memcached_kernel.sh --packet-rate $rate --l2-size 1MB --freq $f &
   done
 done
 
 ## loop over all packet rates and then l2 sizes
 for rate in "${rates[@]}"; do
     for l2 in "${l2_sizes[@]}"; do
-      ./memcached-kernel.sh --num-nics 1 --script memcached_kernel.sh --packet-rate $rate --l2-size $l2 --freq 3GHz &
+      ./memcached-kernel.sh --loadgen-find-bw --num-nics 1 --script memcached_kernel.sh --packet-rate $rate --l2-size $l2 --freq 3GHz &
   done
 done
 

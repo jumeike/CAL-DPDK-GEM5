@@ -1,6 +1,6 @@
 ip link set dev eth0 down
 # ifconfig eth0 192.17.100.7 netmask 255.255.252.0
-ifconfig eth0 192.168.1.1 netmask 255.255.255.0 # IP address from altra (server)
+ifconfig eth0 192.168.1.1 netmask 255.255.255.0 # IP address from altra/castor (server)
 ip link set dev eth0 up
 arp -s 192.168.1.2 08:c0:eb:bf:ee:aa # MAC address from pollux (client)
 # arp -s 192.17.100.243 00:80:00:00:00:01​

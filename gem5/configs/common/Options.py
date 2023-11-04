@@ -433,7 +433,10 @@ def addCommonOptions(parser):
         "that are present under any of the roots. If not given, dump all "
         "stats. ")
 
-
+    parser.add_argument(
+        "--warmup-dpdk", action="store", type=int, default=0,
+        help="Warmup period in ticks (requires --standard-switch)")
+    
     # SHIN. DDIO(and IDIO) related
     parser.add_argument("--ddio-disabled", action="store_true",
                       help="DDIO is disabled")

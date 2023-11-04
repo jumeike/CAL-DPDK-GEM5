@@ -2551,12 +2551,12 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
     DPRINTF(EthernetDpdk, "RxFIFO: Receiving packet from wire\n");
 
     // set rxFifoFull, txRingFull, rxRingFull
-    int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
-    int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
-    int rxFifoFull = (rxFifo.full() ? 1 : 0);
+    // int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
+    // int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
+    // int rxFifoFull = (rxFifo.full() ? 1 : 0);
     // int rxFifoFull = (!rxFifo.push(pkt) ? 1 : 0);
     // call updateDropFSM(rxFifo.full(), txRingFull)
-    updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
+    // updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
 
 
     if (!regs.rctl.en()) {
@@ -2574,11 +2574,11 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
                 "RXS: received packet into fifo, starting ticking\n");
         restartClock();
     }
-    // int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
-    // int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
-    // int rxFifoFull;
+    int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
+    int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
+    int rxFifoFull = 0;
     if (!rxFifo.push(pkt)) {
-        // rxFifoFull =1;
+        rxFifoFull =1;
         DPRINTF(Ethernet, "RxFIFO: Packet won't fit in fifo... dropped\n");
         DPRINTF(EthernetDpdk, "RxFIFO: Packet won't fit in fifo... dropped\n");
         postInterrupt(IT_RXO, true);
@@ -2586,7 +2586,7 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
     }
     // else
         // rxFifoFull=0;
-    // updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
+    updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
     return true;
 }
 

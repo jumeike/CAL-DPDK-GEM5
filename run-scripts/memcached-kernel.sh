@@ -1,16 +1,16 @@
 #!/bin/bash
 
-CACHE_CONFIG="--caches --l2cache --l3cache --l3_size 4MB --ddio-disabled --l3_assoc 16 --l1i_size=64kB --l1i_assoc=4 \
+CACHE_CONFIG="--caches --l2cache --l3cache --l3_size 4MB --ddio-enabled --l3_assoc 16 --l1i_size=64kB --l1i_assoc=4 \
 --l1d_size=64kB --l1d_assoc=4 --l2_assoc=8 --cacheline_size=64" 
-CPU_CONFIG="--param=system.cpu[0:2].l2cache.mshrs=46 --param=system.cpu[0:2].dcache.mshrs=20 \
-  --param=system.cpu[0:2].icache.mshrs=20 --param=system.switch_cpus[0:2].decodeWidth=4 \
-  --param=system.switch_cpus[0:2].numROBEntries=128 --param=system.switch_cpus[0:2].numIQEntries=64 \
-  --param=system.switch_cpus[0:2].LQEntries=68 --param=system.switch_cpus[0:2].SQEntries=72 \
-  --param=system.switch_cpus[0:2].numPhysIntRegs=256 --param=system.switch_cpus[0:2].numPhysFloatRegs=256 \
-  --param=system.switch_cpus[0:2].branchPred.BTBEntries=8192 --param=system.switch_cpus[0:2].issueWidth=8 \
-  --param=system.switch_cpus[0:2].commitWidth=8 --param=system.switch_cpus[0:2].dispatchWidth=8 \
-  --param=system.switch_cpus[0:2].fetchWidth=8 --param=system.switch_cpus[0:2].wbWidth=8 \
-  --param=system.switch_cpus[0:2].squashWidth=8 --param=system.switch_cpus[0:2].renameWidth=8"
+CPU_CONFIG="--param=system.cpu[0:4].l2cache.mshrs=46 --param=system.cpu[0:4].dcache.mshrs=20 \
+  --param=system.cpu[0:4].icache.mshrs=20 --param=system.switch_cpus[0:4].decodeWidth=4 \
+  --param=system.switch_cpus[0:4].numROBEntries=128 --param=system.switch_cpus[0:4].numIQEntries=64 \
+  --param=system.switch_cpus[0:4].LQEntries=68 --param=system.switch_cpus[0:4].SQEntries=72 \
+  --param=system.switch_cpus[0:4].numPhysIntRegs=256 --param=system.switch_cpus[0:4].numPhysFloatRegs=256 \
+  --param=system.switch_cpus[0:4].branchPred.BTBEntries=8192 --param=system.switch_cpus[0:4].issueWidth=8 \
+  --param=system.switch_cpus[0:4].commitWidth=8 --param=system.switch_cpus[0:4].dispatchWidth=8 \
+  --param=system.switch_cpus[0:4].fetchWidth=8 --param=system.switch_cpus[0:4].wbWidth=8 \
+  --param=system.switch_cpus[0:4].squashWidth=8 --param=system.switch_cpus[0:4].renameWidth=8"
 
 function usage {
   echo "Usage: $0 --num-nics <num_nics> [--script <script>] [--loadgen-find-bw] [--take-checkpoint] [-h|--help]"
@@ -28,7 +28,7 @@ function setup_dirs {
 }
 
 function run_simulation {
-  "$GEM5_DIR/build/ARM/gem5.$GEM5TYPE" $DEBUG_FLAGS --outdir="$RUNDIR" \
+  "$GEM5_DIR/gem5.$GEM5TYPE" $DEBUG_FLAGS --outdir="$RUNDIR" \
   "$GEM5_DIR"/configs/example/fs.py --cpu-type=$CPUTYPE \
   --kernel="$RESOURCES/vmlinux" --disk="$RESOURCES/rootfs.ext2" --bootloader="$RESOURCES/boot.arm64" --root=/dev/sda \
   --num-cpus=$(($num_nics+3)) --mem-type=DDR4_2400_16x4 --mem-channels=4 --mem-size=65536MB --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
@@ -128,13 +128,13 @@ else
   PORT=11211    # for memcached
   PCAP_FILENAME="../resources/request_trace.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10))
-  RUNDIR=${GIT_ROOT}/rundir/request_trace-test-memcached_kernel_newkernel1/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-disabled"
+  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/memcached-kernel-O3CPU/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-enabled"
   setup_dirs
   CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
-  DEBUG_FLAGS="--debug-flags=LoadgenDebug"
-  CONFIGARGS="--l2_size=$L2_SIZE --cpu-clock=$FREQ $CACHE_CONFIG -r 2 --loadgen-type=Pcap --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=20619488205000 -m=23619488205000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT --loadgen-increment-interva=$INCR_INTERVAL"
+  DEBUG_FLAGS="--debug-flags=EthernetAll" #LoadgenDebug"
+  CONFIGARGS="--l2_size=$L2_SIZE --cpu-clock=$FREQ $CACHE_CONFIG $CPU_CONFIG -r 2 --loadgen-type=Pcap --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=20619488205000 -m=23619488205000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT --loadgen-increment-interva=$INCR_INTERVAL"
   run_simulation > ${RUNDIR}/simout
   exit
 fi
