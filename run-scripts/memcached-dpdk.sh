@@ -1,16 +1,16 @@
 #!/bin/bash
 
-CACHE_CONFIG="--caches --l2cache --l3cache --l3_size 16MB --l3_assoc 16 --l1i_size=64kB --l1i_assoc=4 \
+CACHE_CONFIG="--caches --l2cache --l3cache --l3_size 16MB --l3_assoc 16 --ddio-enabled --l1i_size=64kB --l1i_assoc=4 \
 --l1d_size=64kB --l1d_assoc=4 --l2_assoc=8 --cacheline_size=64" 
-CPU_CONFIG="--param=system.cpu[0:8].l2cache.mshrs=46 --param=system.cpu[0:8].dcache.mshrs=20 \
-  --param=system.cpu[0:8].icache.mshrs=20 --param=system.switch_cpus[0:8].decodeWidth=4
-  --param=system.switch_cpus[0:8].numROBEntries=128 --param=system.switch_cpus[0:8].numIQEntries=120 \
-  --param=system.switch_cpus[0:8].LQEntries=68 --param=system.switch_cpus[0:8].SQEntries=72 \
-  --param=system.switch_cpus[0:8].numPhysIntRegs=256 --param=system.switch_cpus[0:8].numPhysFloatRegs=256 \
-  --param=system.switch_cpus[0:8].branchPred.BTBEntries=8192 --param=system.switch_cpus[0:8].issueWidth=8 \
-  --param=system.switch_cpus[0:8].commitWidth=8 --param=system.switch_cpus[0:8].dispatchWidth=8 \
-  --param=system.switch_cpus[0:8].fetchWidth=8 --param=system.switch_cpus[0:8].wbWidth=8 \
-  --param=system.switch_cpus[0:8].squashWidth=8 --param=system.switch_cpus[0:8].renameWidth=8"
+CPU_CONFIG="--param=system.cpu[0:4].l2cache.mshrs=46 --param=system.cpu[0:4].dcache.mshrs=20 \
+  --param=system.cpu[0:4].icache.mshrs=20 --param=system.switch_cpus[0:4].decodeWidth=4 \
+  --param=system.switch_cpus[0:4].numROBEntries=128 --param=system.switch_cpus[0:4].numIQEntries=120 \
+  --param=system.switch_cpus[0:4].LQEntries=68 --param=system.switch_cpus[0:4].SQEntries=72 \
+  --param=system.switch_cpus[0:4].numPhysIntRegs=256 --param=system.switch_cpus[0:4].numPhysFloatRegs=256 \
+  --param=system.switch_cpus[0:4].branchPred.BTBEntries=8192 --param=system.switch_cpus[0:4].issueWidth=8 \
+  --param=system.switch_cpus[0:4].commitWidth=8 --param=system.switch_cpus[0:4].dispatchWidth=8 \
+  --param=system.switch_cpus[0:4].fetchWidth=4 --param=system.switch_cpus[0:4].wbWidth=8 \
+  --param=system.switch_cpus[0:4].squashWidth=8 --param=system.switch_cpus[0:4].renameWidth=8"
 
 function usage {
   echo "Usage: $0 --num-nics <num_nics> [--script <script>] [--loadgen-find-bw] [--take-checkpoint] [-h|--help]"
@@ -31,7 +31,7 @@ function run_simulation {
   "$GEM5_DIR/build/ARM/gem5.$GEM5TYPE" $DEBUG_FLAGS --outdir="$RUNDIR" \
   "$GEM5_DIR"/configs/example/fs.py --cpu-type=$CPUTYPE \
   --kernel="$RESOURCES/vmlinux" --disk="$RESOURCES/rootfs.ext2" --bootloader="$RESOURCES/boot.arm64" --root=/dev/sda \
-  --num-cpus=$(($num_nics+7)) --mem-type=DDR4_2400_16x4 --mem-channels=4 --mem-size=65536MB --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
+  --num-cpus=$(($num_nics+4)) --mem-type=DDR4_2400_16x4 --mem-channels=4 --mem-size=65536MB --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
   --num-nics="$num_nics" --num-loadgens="$num_nics" \
   --checkpoint-dir="$CKPT_DIR" $CONFIGARGS
 }
@@ -47,7 +47,7 @@ RESOURCES=${GIT_ROOT}/resources-dpdk
 GUEST_SCRIPT_DIR=${GIT_ROOT}/guest-scripts
 
 # parse command line arguments
-TEMP=$(getopt -o 'h' --long freq:,take-checkpoint,num-nics:,script:,packet-rate,loadgen-find-bw,help -n 'dpdk-loadgen' -- "$@")
+TEMP=$(getopt -o 'h' --long freq:,take-checkpoint,num-nics:,l2-size:,script:,packet-rate:,loadgen-find-bw,help -n 'dpdk-loadgen' -- "$@")
 
 # check for parsing errors
 if [ $? != 0 ]; then
@@ -63,6 +63,10 @@ while true; do
     num_nics="$2"
     shift 2
     ;;
+  --l2-size)
+    L2_SIZE="$2"
+    shift 2
+    ;;
   --freq)
     FREQ="$2"
     shift 2
@@ -76,7 +80,7 @@ while true; do
     shift 2
     ;;
   --packet-rate)
-    PACKET_RATE="$3"
+    PACKET_RATE="$2"
     shift 2
     ;;
   --loadgen-find-bw)
@@ -103,7 +107,7 @@ fi
 
 if [[ -n "$checkpoint" ]]; then
   # RUNDIR=${GIT_ROOT}/rundir/$num_nics"NIC-ckp-"$GUEST_SCRIPT
-  RUNDIR=${GIT_ROOT}/rundir/ckpts-with-new-vmlinux/$num_nics"NIC-ckp"-$GUEST_SCRIPT
+  RUNDIR=${GIT_ROOT}/rundir/ISPASS-2024/$num_nics"NIC-ckp"-$GUEST_SCRIPT
   setup_dirs
   echo "Taking Checkpoint for NICs=$num_nics" >&2
   GEM5TYPE="fast"
@@ -112,11 +116,11 @@ if [[ -n "$checkpoint" ]]; then
   CPUTYPE="AtomicSimpleCPU"
   PACKET_RATE=40000
   LOADGENREPLAYMODE=ConstThroughput
-  PCAP_FILENAME="../resources-dpdk/warmup-dpdk-trace.pcap"
+  PCAP_FILENAME="../resources-dpdk/warmup-dpdk.pcap"
   # PCAP_FILENAME="../resources/warmup-dpdk-trace.pcap"
-  CONFIGARGS="-r 3 --max-checkpoints 1 --checkpoint-at-end --cpu-clock=$FREQ $CACHE_CONFIG --loadgen-start=9736717314889 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
-  # CONFIGARGS="--max-checkpoints 2 --cpu-clock=$FREQ $CACHE_CONFIG --loadgen-start=6011771117451658 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
-  run_simulation > ${RUNDIR}/simout-$CPUTYPE-$PACKET_RATE-$GEM5TYPE-'burst-32-debug' # --checkpoint-at-end --loadgen-start=5739769265230 -m 605739769265230
+  CONFIGARGS="-r 2 --max-checkpoints 1 --checkpoint-at-end --cpu-clock=$FREQ --l2_size=$L2_SIZE $CACHE_CONFIG --loadgen-start=10740162772081 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
+  # CONFIGARGS="--max-checkpoints 2 --cpu-clock=$FREQ --l2_size=$L2_SIZE $CACHE_CONFIG --loadgen-start=600011771117451658 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
+  run_simulation #> ${RUNDIR}/simout-$CPUTYPE-$PACKET_RATE-$GEM5TYPE-'burst-32-debug' # --checkpoint-at-end --loadgen-start=5739769265230 -m 605739769265230
   exit 0
 else
   if [[ -z "$PACKET_RATE" ]]; then
@@ -128,13 +132,13 @@ else
   # PCAP_FILENAME="../resources/request-dpdk-trace.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10)) 
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
-  RUNDIR=${GIT_ROOT}/rundir/test/O3CPU-256-DescRingN-5000-Keys-1-burst-wbwidth-4/$num_nics"NIC-"$PACKET_RATE"RATE-"$LOADGENREPLAYMODE-"Incr-"$INCR_INTERVAL-$GUEST_SCRIPT
+  RUNDIR=${GIT_ROOT}/rundir/memcached-dpdk-freq-exp/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-enabled"
   setup_dirs
   CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
   # LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug"
-  CONFIGARGS="$CACHE_CONFIG $CPU_CONFIG -r 8 --cpu-clock=$FREQ --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=9861517414890 --rel-max-tick=10000000000000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT --loadgen-increment-interva=$INCR_INTERVAL"
+  CONFIGARGS="--l2_size=$L2_SIZE $CACHE_CONFIG $CPU_CONFIG -r 3 --cpu-clock=$FREQ --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --loadgen-start=11240222772082 --rel-max-tick=1000000000000 --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT --loadgen-increment-interva=$INCR_INTERVAL"
   run_simulation > ${RUNDIR}/simout
   exit
 fi

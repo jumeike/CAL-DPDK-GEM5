@@ -49,7 +49,7 @@ class ArmTLB(BaseTLB):
     is_stage2 = Param.Bool(False, "Is this a stage 2 TLB?")
 
 class ArmStage2TLB(ArmTLB):
-    size = 32
+    size = 1280
     is_stage2 = True
 
 class ArmITB(ArmTLB):

@@ -302,8 +302,8 @@ void LoadGeneratorPcap::checkLoss() {
             packetRate);
     DPRINTF(LoadgenDebug, "Rx %lu, Tx %lu \n", lastRxCount, lastTxCount);
     // exitSimLoop("LOSS DETECTED" "SIM TERMINATED BY LOADGEN");
-    // if (packetRate==0)
-    //   exitSimLoop("PACKET RATE DROPPED TO ZERO" "SIM TERMINATED BY LOADGEN");
+    if (packetRate==0)
+      exitSimLoop("PACKET RATE DROPPED TO ZERO" "SIM TERMINATED BY LOADGEN");
   }
 
   lastTxCount = 0;

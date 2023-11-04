@@ -72,15 +72,15 @@ class L2Cache(Cache):
     write_buffers = 8
     
     # SHIN.
-    ddio_way_part = 4
-    is_llc = True
+    # ddio_way_part = 4
+    is_llc = False
 
 
 class IOCache(Cache):
     assoc = 8
-    tag_latency = 20
-    data_latency = 20
-    response_latency = 20
+    tag_latency = 50
+    data_latency = 50
+    response_latency = 50
     mshrs = 20
     size = '1kB'
     tgts_per_mshr = 12
@@ -139,9 +139,9 @@ class L2MLC(Cache):
 class L3(Cache):
     size = '16MB'
     assoc = 16
-    tag_latency = 20
-    data_latency = 20
-    response_latency = 20
+    tag_latency = 30
+    data_latency = 30
+    response_latency = 30
     mshrs = 20
     tgts_per_mshr = 12
     clusivity='mostly_excl'
@@ -152,5 +152,5 @@ class L3(Cache):
     tags = BaseSetAssoc()
     repl_policy = RandomRP()
     #repl_policy = LRURP()
-    ddio_way_part = 4
+    ddio_way_part = 2 # original 4
     is_llc = True

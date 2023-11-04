@@ -321,10 +321,10 @@ def build_test_system(np):
     # -     test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges)
             test_sys.iocache = IOCache(addr_ranges = test_sys.mem_ranges,
                                     is_iocache = True,
-                                    ddio_enabled = True,
-                                    assoc = 16, tag_latency = 2,
-                                    data_latency = 2, response_latency = 2,
-                                    write_buffers = 64)
+                                    ddio_enabled = True,)
+                                    # assoc = 16, tag_latency = 2,
+                                    # data_latency = 2, response_latency = 2,
+                                    # write_buffers = 64)
 
             test_sys.iocache.cpu_side = test_sys.iobus.master
             test_sys.iocache.mem_side = test_sys.tol3bus.slave
