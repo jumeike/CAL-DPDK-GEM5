@@ -2578,7 +2578,8 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
     int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
     int rxFifoFull = 0;
     if (!rxFifo.push(pkt)) {
-        rxFifoFull =1;
+        rxFifoFull = 1;
+        updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
         DPRINTF(Ethernet, "RxFIFO: Packet won't fit in fifo... dropped\n");
         DPRINTF(EthernetDpdk, "RxFIFO: Packet won't fit in fifo... dropped\n");
         postInterrupt(IT_RXO, true);
