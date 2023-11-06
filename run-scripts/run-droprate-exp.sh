@@ -8,8 +8,8 @@
 
 # wait
 
-for j in 1GHz 2GHz 3GHz;do
-  for i in {10..18..1};do
+for j in 3GHz;do
+  for i in {1..18..1};do
     ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i)) --packet-size 64 --freq $j &
   done
 done
@@ -24,13 +24,13 @@ wait
 
 # wait
 
-# for j in 1GHz 2GHz 3GHz;do
-#   for i in {11..19..1};do
-#     ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/2)) --packet-size 128 --freq $j &
-#   done
-# done
+for j in 3GHz;do
+  for i in {11..28..1};do
+    ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/2)) --packet-size 128 --freq $j &
+  done
+done
 
-# wait
+wait
 
 # for j in 1GHz 2GHz 3GHz;do
 #   for i in {20..28..1};do
@@ -56,21 +56,21 @@ wait
 
 # wait 
 
-# for j in 1GHz 2GHz 3GHz;do
-#   for i in {42..50..1};do
-#     ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/4)) --packet-size 256 --freq $j &
-#   done
-# done
+for j in 3GHz;do
+  for i in {20..42..1};do
+    ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/4)) --packet-size 256 --freq $j &
+  done
+done
 
-# wait
+wait
 
-# for j in 1GHz 2GHz 3GHz;do
-#   for i in {42..50..1};do
-#     ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/8)) --packet-size 512 --freq $j &
-#   done
-# done
+for j in 3GHz;do
+  for i in {42..60..1};do
+    ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/8)) --packet-size 512 --freq $j &
+  done
+done
 
-# wait
+wait
 
 # for j in 1GHz 2GHz 3GHz;do
 #   for i in {51..59..1};do
@@ -88,13 +88,13 @@ wait
 
 # wait
 
-# for j in 1GHz 2GHz 3GHz;do
-#   for i in {48..56..1};do
-#     ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/16)) --packet-size 1024 --freq $j &
-#   done
-# done
+for j in 3GHz;do
+  for i in {48..65..1};do
+    ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((2150786*$i/16)) --packet-size 1024 --freq $j &
+  done
+done
 
-# wait
+wait
 
 # for j in 1GHz 2GHz 3GHz;do
 #   for i in {57..65..1};do
@@ -144,11 +144,11 @@ wait
 
 # # wait 
 
-# for j in 1GHz 2GHz 3GHz;do
-#   for i in {45..53..1};do
-#     ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((88418*$i)) --packet-size 1518 --freq $j &
-#   done
-# done
+for j in 3GHz;do
+  for i in {45..65..1};do
+    ./l2fwd-ckp.sh --num-nics 1  --script dpdk-testpmd.sh --packet-rate $((88418*$i)) --packet-size 1518 --freq $j &
+  done
+done
 
 # wait
 

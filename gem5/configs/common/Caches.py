@@ -73,14 +73,14 @@ class L2Cache(Cache):
     
     # SHIN.
     # ddio_way_part = 4
-    is_llc = False
+    # is_llc = False
 
 
 class IOCache(Cache):
     assoc = 8
-    tag_latency = 50
-    data_latency = 50
-    response_latency = 50
+    tag_latency = 20
+    data_latency = 20
+    response_latency = 20
     mshrs = 20
     size = '1kB'
     tgts_per_mshr = 12
@@ -139,9 +139,9 @@ class L2MLC(Cache):
 class L3(Cache):
     size = '16MB'
     assoc = 16
-    tag_latency = 30
-    data_latency = 30
-    response_latency = 30
+    tag_latency = 20
+    data_latency = 20
+    response_latency = 20
     mshrs = 20
     tgts_per_mshr = 12
     clusivity='mostly_excl'

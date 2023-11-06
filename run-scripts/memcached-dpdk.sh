@@ -31,7 +31,7 @@ function run_simulation {
   "$GEM5_DIR/build/ARM/gem5.$GEM5TYPE" $DEBUG_FLAGS --outdir="$RUNDIR" \
   "$GEM5_DIR"/configs/example/fs.py --cpu-type=$CPUTYPE \
   --kernel="$RESOURCES/vmlinux" --disk="$RESOURCES/rootfs.ext2" --bootloader="$RESOURCES/boot.arm64" --root=/dev/sda \
-  --num-cpus=$(($num_nics+4)) --mem-type=DDR4_2400_16x4 --mem-channels=4 --mem-size=65536MB --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
+  --num-cpus=$(($num_nics+3)) --mem-type=DDR4_2400_16x4 --mem-channels=4 --mem-size=65536MB --script="$GUEST_SCRIPT_DIR/$GUEST_SCRIPT" \
   --num-nics="$num_nics" --num-loadgens="$num_nics" \
   --checkpoint-dir="$CKPT_DIR" $CONFIGARGS
 }
@@ -118,7 +118,7 @@ if [[ -n "$checkpoint" ]]; then
   LOADGENREPLAYMODE=ConstThroughput
   PCAP_FILENAME="../resources-dpdk/warmup-dpdk.pcap"
   # PCAP_FILENAME="../resources/warmup-dpdk-trace.pcap"
-  CONFIGARGS="-r 2 --max-checkpoints 1 --checkpoint-at-end --cpu-clock=$FREQ --l2_size=$L2_SIZE $CACHE_CONFIG --loadgen-start=10740162772081 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
+  CONFIGARGS="-r 3 --max-checkpoints 1 --checkpoint-at-end --cpu-clock=$FREQ --l2_size=$L2_SIZE $CACHE_CONFIG --loadgen-start=5739545096623 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
   # CONFIGARGS="--max-checkpoints 2 --cpu-clock=$FREQ --l2_size=$L2_SIZE $CACHE_CONFIG --loadgen-start=600011771117451658 --loadgen-type=Pcap --loadgen-stack=DPDKStack --loadgen_pcap_filename=$PCAP_FILENAME --packet-rate=$PACKET_RATE --loadgen-replymode=$LOADGENREPLAYMODE --loadgen-port-filter=$PORT"
   run_simulation #> ${RUNDIR}/simout-$CPUTYPE-$PACKET_RATE-$GEM5TYPE-'burst-32-debug' # --checkpoint-at-end --loadgen-start=5739769265230 -m 605739769265230
   exit 0
@@ -134,7 +134,7 @@ else
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   RUNDIR=${GIT_ROOT}/rundir/memcached-dpdk-freq-exp/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-enabled"
   setup_dirs
-  CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
+  CPUTYPE="O3_ARM_v7a_3" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
   # LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug"

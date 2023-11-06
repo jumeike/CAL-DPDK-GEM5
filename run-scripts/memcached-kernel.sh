@@ -129,9 +129,9 @@ else
   PORT=11211    # for memcached
   PCAP_FILENAME="../resources-dpdk/request.pcap"
   ((INCR_INTERVAL = PACKET_RATE / 10))
-  RUNDIR=${GIT_ROOT}/rundir/memcached-kernel-freq-exp/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-enabled"
+  RUNDIR=${GIT_ROOT}/rundir/memcached-kernel-msb-exp/$L2_SIZE"l2-"$FREQ"freq"-$PACKET_RATE"pkt-ddio-enabled"
   setup_dirs
-  CPUTYPE="DerivO3CPU" # just because DerivO3CPU is too slow sometimes
+  CPUTYPE="O3_ARM_v7a_3" # just because DerivO3CPU is too slow sometimes
   GEM5TYPE="opt"
   LOADGENREPLAYMODE=${LOADGENREPLAYMODE:-"ConstThroughput"}
   DEBUG_FLAGS="--debug-flags=LoadgenDebug"

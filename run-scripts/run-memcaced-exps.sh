@@ -16,7 +16,7 @@ for rate in "${rates[@]}"; do
   done
 done
 wait
-## loop over all packet rates and then l2 sizes
+# loop over all packet rates and then l2 sizes
 for rate in "${rates[@]}"; do
     for l2 in "${l2_sizes[@]}"; do
       ./memcached-kernel.sh --num-nics 1 --script memcached_kernel.sh --packet-rate $rate --l2-size $l2 --freq 3GHz &
