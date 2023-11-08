@@ -63,6 +63,7 @@ class EtherDevice : public PciDevice
         statistics::Scalar coreDrops;
         statistics::Scalar txDrops;
         statistics::Scalar unknownDrops;
+        statistics::Scalar rxdisabledDrops;
         statistics::Scalar rxRingBufferFull;
         statistics::Scalar txRingBufferFull;
 

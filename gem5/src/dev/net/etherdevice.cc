@@ -43,6 +43,8 @@ EtherDevice::EtherDeviceStats::EtherDeviceStats(statistics::Group *parent)
                "Number of packet drops due to TX Ring Buffer bottleneck"),
       ADD_STAT(unknownDrops, statistics::units::Count::get(),
                "Number of packet drops due to either dma, core, or tx bottleneck"),
+      ADD_STAT(rxdisabledDrops, statistics::units::Count::get(),
+               "Number of packet drops due to rx state machine being disabled"),
       ADD_STAT(rxRingBufferFull, statistics::units::Count::get(),
                "Number of times the rxRingBuffer fills up"),
       ADD_STAT(txRingBufferFull, statistics::units::Count::get(),
