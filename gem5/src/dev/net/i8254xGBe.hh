@@ -143,7 +143,7 @@ class IGbE : public EtherDevice
 
     void rxStateMachine();
     void txStateMachine();
-    void updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull);
+    void updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFull);
     void txWire();
 
     /** Write an interrupt into the interrupt pending register and check mask
