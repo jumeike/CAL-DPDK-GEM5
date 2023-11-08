@@ -2215,6 +2215,7 @@ IGbE::txStateMachine()
                     "TXS: No packets to get, writing back used descriptors\n");
             txDescCache.writeback(0);
         } else {
+            etherDeviceStats.txFifoFullCount++;
             DPRINTF(EthernetSM, "TXS: FIFO full, stopping ticking until space "
                     "available in FIFO\n");
             DPRINTF(EthernetDpdk, "TXS: FIFO full, stopping ticking until space "
@@ -2232,7 +2233,7 @@ IGbE::txStateMachine()
 
 char currState = 'A', nextState;
 void
-IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
+IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFull)
 {
     // State Encoding: rxFifoFull,rxRingFull,txRingFull
     // 000 -> "A" || 001 -> "B" || 010 -> "C" || 011 = "D"
@@ -2359,16 +2360,16 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
-                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops++)
+                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
             }
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
-                etherDeviceStats.txDrops++; //confirm-done
+                etherDeviceStats.dmaDrops++; //confirm-done (initially txDrops)
                 etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
-                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops++)
+                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
                 etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
@@ -2415,7 +2416,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.unknownDrops++; //confirm-done (initially txDrops++)
+                etherDeviceStats.unknownDrops++; //confirm-done (initially txDrops)
                 etherDeviceStats.rxRingBufferFull++;
                 etherDeviceStats.txRingBufferFull++;
             }   
@@ -2451,7 +2452,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.txDrops++;
+                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
                 etherDeviceStats.rxRingBufferFull++;
                 etherDeviceStats.txRingBufferFull++;
             }   
@@ -2475,11 +2476,11 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
-                etherDeviceStats.coreDrops++; //confirm-done (initially dmaDrops++)
+                etherDeviceStats.dmaDrops++; //confirm-done (initially dmaDrops++)
             }
             else if(rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'F';
-                etherDeviceStats.coreDrops++; //confirm-done (initially dmaDrops++)
+                etherDeviceStats.dmaDrops++; //confirm-done (initially dmaDrops++)
                 etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
@@ -2512,11 +2513,11 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull)
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
-                etherDeviceStats.unknownDrops++; //confirm-done (initially dmaDrops++)
+                etherDeviceStats.dmaDrops++;
             }
             else if(rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'F';
-                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.coreDrops++; //confirm-done (initially dmaDrops)
                 etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
@@ -2578,9 +2579,11 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
     int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
     int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
     int rxFifoFull = 0;
+    int txFifoFull = 0;
     if (!rxFifo.push(pkt)) {
         rxFifoFull = 1;
-        updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
+        etherDeviceStats.rxFifoFullCount++;
+        updateDropFSM(rxFifoFull, rxRingFull, txRingFull, txFifoFull);
         DPRINTF(Ethernet, "RxFIFO: Packet won't fit in fifo... dropped\n");
         DPRINTF(EthernetDpdk, "RxFIFO: Packet won't fit in fifo... dropped\n");
         postInterrupt(IT_RXO, true);
@@ -2588,7 +2591,7 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
     }
     // else
         // rxFifoFull=0;
-    updateDropFSM(rxFifoFull, rxRingFull, txRingFull);
+    updateDropFSM(rxFifoFull, rxRingFull, txRingFull, txFifoFull);
     return true;
 }
 
