@@ -2168,6 +2168,7 @@ IGbE::txStateMachine()
             postInterrupt(IT_TXQE);
             txDescCache.writeback(0);
             txDescCache.fetchDescriptors();
+            etherDeviceStats.txRingBufferFull++;
             DPRINTF(EthernetSM, "TXS: No descriptors left in ring, forcing "
                     "writeback stopping ticking and posting TXQE\n");
             DPRINTF(EthernetDpdk, "TXS: No descriptors left in ring, forcing "
@@ -2179,6 +2180,7 @@ IGbE::txStateMachine()
 
         if (!(txDescCache.descUnused())) {
             txDescCache.fetchDescriptors();
+            etherDeviceStats.txDescCacheFullCount++;
             DPRINTF(EthernetSM, "TXS: No descriptors available in cache, "
                     "fetching and stopping ticking\n");
             DPRINTF(EthernetDpdk, "TXS: No descriptors available in cache, "
@@ -2243,11 +2245,11 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
         case 'A':
             if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull){
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2256,23 +2258,23 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
                 etherDeviceStats.unknownDrops++;
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else
                 nextState = 'A';
@@ -2282,7 +2284,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && rxRingFull && !txRingFull){
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2291,27 +2293,27 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++; //confirm-done
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
                 etherDeviceStats.unknownDrops++; //initially txDrops
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             break;
         case 'C':
@@ -2319,7 +2321,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2328,27 +2330,30 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
-                etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
+                if(txDescCache.descLeft() == 1024 || (!txDescCache.descUnused() && txDescCache.descLeft()))
+                    etherDeviceStats.txDrops++;
+                else
+                    etherDeviceStats.coreDrops++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }   
             else {
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             break;
         case 'D':
@@ -2356,7 +2361,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2365,27 +2370,27 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++; //confirm-done (initially txDrops)
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
                 etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.txDrops++;
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                etherDeviceStats.coreDrops++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }   
             else {
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             break;
         case 'E':
@@ -2393,32 +2398,32 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull){
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
                 etherDeviceStats.unknownDrops++; //confirm-done (initially txDrops)
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }   
             else{
                 nextState = 'E';
@@ -2430,12 +2435,12 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull){
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2444,22 +2449,22 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
                 etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }   
             else{
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }  
             break;
         case 'G':
@@ -2467,12 +2472,12 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull){
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2481,22 +2486,22 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'F';
                 etherDeviceStats.dmaDrops++; //confirm-done (initially dmaDrops++)
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }   
             else{
                 nextState = 'G';
                 etherDeviceStats.coreDrops++;
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }  
             break;
         case 'H':
@@ -2504,12 +2509,12 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
                 nextState = 'A';
             else if(!rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'B';
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull){
                 nextState = 'D';
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
@@ -2518,22 +2523,22 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             else if(rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'F';
                 etherDeviceStats.coreDrops++; //confirm-done (initially dmaDrops)
-                etherDeviceStats.txRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'C';
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
                 etherDeviceStats.coreDrops++; //confirm-done
-                etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.rxRingBufferFull++;
             }   
             else{
                 nextState = 'H';
-                etherDeviceStats.txDrops++;
-                etherDeviceStats.rxRingBufferFull++;
-                etherDeviceStats.txRingBufferFull++;
+                etherDeviceStats.coreDrops++;
+                // etherDeviceStats.rxRingBufferFull++;
+                // etherDeviceStats.txRingBufferFull++;
             }  
             break;
     }
@@ -2605,7 +2610,6 @@ IGbE::rxStateMachine()
         DPRINTF(EthernetDpdk, "RXS: RX disabled, stopping ticking\n");
         return;
     }
-
     // If the packet is done check for interrupts/descriptors/etc
     if (rxDescCache.packetDone()) {
         rxDmaPacket = false;
@@ -2637,6 +2641,7 @@ IGbE::rxStateMachine()
 
         if (descLeft == 0) {
             rxDescCache.writeback(0);
+            etherDeviceStats.rxRingBufferFull++;
             DPRINTF(EthernetSM, "RXS: No descriptors left in ring, forcing"
                     " writeback and stopping ticking\n");
             DPRINTF(EthernetDpdk, "RXS: No descriptors left in ring, forcing"
@@ -2667,9 +2672,10 @@ IGbE::rxStateMachine()
                     "descUnused < PTHRESH\n");
             rxDescCache.fetchDescriptors();
         }
-
+        
         if (rxDescCache.descUnused() == 0) {
             rxDescCache.fetchDescriptors();
+            etherDeviceStats.rxDescCacheFullCount++;
             DPRINTF(EthernetSM, "RXS: No descriptors available in cache, "
                     "fetching descriptors and stopping ticking\n");
             DPRINTF(EthernetDpdk, "RXS: No descriptors available in cache, "
@@ -2690,6 +2696,7 @@ IGbE::rxStateMachine()
 
     if (!rxDescCache.descUnused()) {
         rxDescCache.fetchDescriptors();
+        etherDeviceStats.rxDescCacheFullCount++;
         DPRINTF(EthernetSM, "RXS: No descriptors available in cache, "
                 "stopping ticking\n");
         DPRINTF(EthernetDpdk, "RXS: No descriptors available in cache, "
