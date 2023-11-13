@@ -2272,7 +2272,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.unknownDrops++;
+                etherDeviceStats.txDrops++;
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }
@@ -2307,7 +2307,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.unknownDrops++; //initially txDrops
+                etherDeviceStats.txDrops++; //initially txDrops
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }
@@ -2334,10 +2334,10 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
                 nextState = 'G';
-                if(txDescCache.descLeft() == 1024 || (!txDescCache.descUnused() && txDescCache.descLeft()))
-                    etherDeviceStats.txDrops++;
-                else
-                    etherDeviceStats.coreDrops++;
+                // if(txDescCache.descLeft() == 1024 || (!txDescCache.descUnused() && txDescCache.descLeft()))
+                //     etherDeviceStats.txDrops++;
+                // else
+                etherDeviceStats.coreDrops++;
                 // etherDeviceStats.rxRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && txRingFull) {
@@ -2421,7 +2421,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.unknownDrops++; //confirm-done (initially txDrops)
+                etherDeviceStats.txDrops++; //confirm-done (initially txDrops)
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }   
@@ -2457,7 +2457,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
+                etherDeviceStats.txDrops++; //confirm-done (initially txDrops)
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }   
@@ -2494,7 +2494,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.coreDrops++;
+                etherDeviceStats.txDrops++;
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }   
@@ -2522,7 +2522,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && !rxRingFull && txRingFull) {
                 nextState = 'F';
-                etherDeviceStats.coreDrops++; //confirm-done (initially dmaDrops)
+                etherDeviceStats.dmaDrops++; //confirm-done (initially dmaDrops)
                 // etherDeviceStats.txRingBufferFull++;
             }
             else if(!rxFifoFull && rxRingFull && !txRingFull) {
@@ -2581,8 +2581,8 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
                 "RXS: received packet into fifo, starting ticking\n");
         restartClock();
     }
-    int rxRingFull = (rxDescCache.descLeft() == 0 ? 1 : 0);
-    int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 0) ? 1 : 0);
+    int rxRingFull = ((rxDescCache.packetDone() && rxDescCache.descLeft() == 0) ? 1 : 0); // RX Path: CPU Produces Descriptors and NIC Consumes/Uses
+    int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 1024) ? 1 : 0); // TX Path: CPU Produces Packets and NIC Consumes/Uses
     int rxFifoFull = 0;
     int txFifoFull = 0;
     if (!rxFifo.push(pkt)) {
