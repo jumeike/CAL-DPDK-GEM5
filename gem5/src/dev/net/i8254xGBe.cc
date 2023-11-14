@@ -2165,10 +2165,10 @@ IGbE::txStateMachine()
 
     if (!txDescCache.packetWaiting()) {
         if (txDescCache.descLeft() == 0) {
+            etherDeviceStats.txRingBufferFull++;
             postInterrupt(IT_TXQE);
             txDescCache.writeback(0);
             txDescCache.fetchDescriptors();
-            etherDeviceStats.txRingBufferFull++;
             DPRINTF(EthernetSM, "TXS: No descriptors left in ring, forcing "
                     "writeback stopping ticking and posting TXQE\n");
             DPRINTF(EthernetDpdk, "TXS: No descriptors left in ring, forcing "
@@ -2325,11 +2325,11 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && !rxRingFull && !txRingFull){
                 nextState = 'E';
-                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.coreDrops++;
             }
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
-                etherDeviceStats.dmaDrops++;
+                etherDeviceStats.coreDrops++;
                 // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
@@ -2369,7 +2369,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && !rxRingFull && txRingFull){
                 nextState = 'F';
-                etherDeviceStats.dmaDrops++; //confirm-done (initially txDrops)
+                etherDeviceStats.coreDrops++; //confirm-done (initially txDrops)
                 // etherDeviceStats.txRingBufferFull++;
             }
             else if(rxFifoFull && rxRingFull && !txRingFull) {
@@ -2383,7 +2383,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }
             else if(rxFifoFull && rxRingFull && txRingFull) {
                 nextState = 'H';
-                etherDeviceStats.coreDrops++;
+                etherDeviceStats.txDrops++;
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }   
@@ -2536,7 +2536,7 @@ IGbE::updateDropFSM(int rxFifoFull, int rxRingFull, int txRingFull, int txFifoFu
             }   
             else{
                 nextState = 'H';
-                etherDeviceStats.coreDrops++;
+                etherDeviceStats.txDrops++;
                 // etherDeviceStats.rxRingBufferFull++;
                 // etherDeviceStats.txRingBufferFull++;
             }  
@@ -2581,7 +2581,7 @@ IGbE::ethRxPkt(EthPacketPtr pkt)
                 "RXS: received packet into fifo, starting ticking\n");
         restartClock();
     }
-    int rxRingFull = ((rxDescCache.packetDone() && rxDescCache.descLeft() == 0) ? 1 : 0); // RX Path: CPU Produces Descriptors and NIC Consumes/Uses
+    int rxRingFull = ((rxDescCache.descLeft() == 0) ? 1 : 0); // RX Path: CPU Produces Descriptors and NIC Consumes/Uses
     int txRingFull = ((!txDescCache.packetWaiting() && txDescCache.descLeft() == 1024) ? 1 : 0); // TX Path: CPU Produces Packets and NIC Consumes/Uses
     int rxFifoFull = 0;
     int txFifoFull = 0;
@@ -2640,8 +2640,8 @@ IGbE::rxStateMachine()
             rxDescCache.writeback(0);
 
         if (descLeft == 0) {
-            rxDescCache.writeback(0);
             etherDeviceStats.rxRingBufferFull++;
+            rxDescCache.writeback(0);
             DPRINTF(EthernetSM, "RXS: No descriptors left in ring, forcing"
                     " writeback and stopping ticking\n");
             DPRINTF(EthernetDpdk, "RXS: No descriptors left in ring, forcing"
