@@ -149,7 +149,7 @@ namespace gem5
         uint64_t sendTick;
         memcpy(&sendTick, &(pkt->data[MACHeaderSize]), sizeof(uint64_t));
         
-        float delta = float((gem5::curTick() - sendTick))/10.0e3;
+        float delta = float((gem5::curTick() - sendTick))/10.0e8;
         loadGeneratorStats.latency.sample(delta);
         DPRINTF(LoadgenLatency, "Latency %f \n", delta);
         return true;

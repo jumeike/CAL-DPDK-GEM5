@@ -14,7 +14,7 @@
 
 static constexpr size_t kLatencyHistSize = 100;
 static constexpr unsigned kEtherHeaderSize = 14;
-static constexpr unsigned kCheckLossInterval = 1000;
+static constexpr unsigned kCheckLossInterval = 100;
 static constexpr size_t kLossCheckWaitCycles = 100000000;
 static constexpr uint16_t CheckLossInterval = 1000;
 
@@ -283,7 +283,7 @@ void LoadGeneratorPcap::sendPacket() {
 }
 
 void LoadGeneratorPcap::checkLoss() {
-  if (lastTxCount - lastRxCount < 10) {
+  if (lastTxCount - lastRxCount < 5) {
     // No loss - incrrement packet rate.
     packetRate = packetRate + incrementInterval;
     schedule(sendPacketEvent, curTick() + frequency());
