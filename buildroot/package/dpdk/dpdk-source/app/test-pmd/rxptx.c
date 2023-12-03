@@ -45,6 +45,7 @@
 #include "macswap.h"
 #endif
 
+volatile char flag_touch;
 /*
  * MAC swap forwarding mode: Swap the source and the destination Ethernet
  * addresses of packets before forwarding them.
