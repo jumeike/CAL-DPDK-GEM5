@@ -176,6 +176,7 @@ struct fwd_engine * fwd_engines[] = {
 	&flow_gen_engine,
 	&rx_only_engine,
 	&touch_fwd_engine,
+	&recv_proc_txmit_engine,
 	&tx_only_engine,
 	&csum_fwd_engine,
 	&icmp_echo_engine,
@@ -261,6 +262,12 @@ queueid_t nb_txq = 1; /**< Number of TX queues per port. */
 #define RTE_TEST_TX_DESC_DEFAULT 0
 uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT; /**< Number of RX descriptors. */
 uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT; /**< Number of TX descriptors. */
+
+/*
+ * Configurable value of processing number of cycles.
+ */
+#define RTE_TEST_PROC_CYCLES_DEFAULT 1000
+uint64_t proc_cycles = RTE_TEST_PROC_CYCLES_DEFAULT;
 
 #define RTE_PMD_PARAM_UNSET -1
 /*
@@ -1351,6 +1358,24 @@ check_nb_txd(queueid_t txd)
 	return 0;
 }
 
+/*
+* Check if the processing cycle is valid
+*/
+
+int
+check_proc_cycles(uint64_t cycles){
+	if(cycles < 0)
+		return -1;
+	return 0;
+}
+
+// Function to introduce a delay in terms of CPU cycles
+void wait_cycles(void) {
+    uint64_t start = rte_rdtsc();
+    while (rte_rdtsc() - start < proc_cycles) {
+        // Wait until the required number of cycles has passed
+    }
+}
 
 /*
  * Get the allowed maximum number of hairpin queues.

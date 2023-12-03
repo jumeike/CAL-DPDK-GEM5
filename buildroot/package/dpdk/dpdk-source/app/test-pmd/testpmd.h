@@ -289,6 +289,7 @@ extern struct fwd_engine mac_swap_engine;
 extern struct fwd_engine flow_gen_engine;
 extern struct fwd_engine rx_only_engine;
 extern struct fwd_engine touch_fwd_engine;
+extern struct fwd_engine recv_proc_txmit_engine;
 extern struct fwd_engine tx_only_engine;
 extern struct fwd_engine csum_fwd_engine;
 extern struct fwd_engine icmp_echo_engine;
@@ -410,6 +411,8 @@ extern queueid_t nb_txq;
 
 extern uint16_t nb_rxd;
 extern uint16_t nb_txd;
+
+extern uint64_t proc_cycles;
 
 extern int16_t rx_free_thresh;
 extern int8_t rx_drop_en;
@@ -978,6 +981,8 @@ queueid_t get_allowed_max_nb_txq(portid_t *pid);
 int check_nb_txq(queueid_t txq);
 int check_nb_rxd(queueid_t rxd);
 int check_nb_txd(queueid_t txd);
+int check_proc_cycles(uint64_t cycles);
+void wait_cycles(void);
 queueid_t get_allowed_max_nb_hairpinq(portid_t *pid);
 int check_nb_hairpinq(queueid_t hairpinq);
 
