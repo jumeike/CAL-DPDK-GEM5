@@ -140,6 +140,7 @@ usage(char* progname)
 	printf("  --rxd=N: set the number of descriptors in RX rings to N.\n");
 	printf("  --txq=N: set the number of TX queues per port to N.\n");
 	printf("  --txd=N: set the number of descriptors in TX rings to N.\n");
+	printf("  --proc_cycles=N: set the number of processing cycles to N.\n");
 	printf("  --hairpinq=N: set the number of hairpin queues per port to "
 	       "N.\n");
 	printf("  --burst=N: set the number of packets per burst to N.\n");
@@ -539,6 +540,7 @@ launch_args_parse(int argc, char** argv)
 		{ "txq",			1, 0, 0 },
 		{ "rxd",			1, 0, 0 },
 		{ "txd",			1, 0, 0 },
+		{ "proc_cycles",	1, 0, 0 },
 		{ "hairpinq",			1, 0, 0 },
 		{ "hairpin-mode",		1, 0, 0 },
 		{ "burst",			1, 0, 0 },
@@ -1112,6 +1114,13 @@ launch_args_parse(int argc, char** argv)
 					nb_txd = (uint16_t) n;
 				else
 					rte_exit(EXIT_FAILURE, "txd must be in > 0\n");
+			}
+			if (!strcmp(lgopts[opt_idx].name, "proc_cycles")) {
+				n = atoi(optarg);
+				if (n >= 0)
+					proc_cycles = (uint64_t) n;
+				else
+					rte_exit(EXIT_FAILURE, "proc_cycles must be in >= 0\n");
 			}
 			if (!strcmp(lgopts[opt_idx].name, "txpt")) {
 				n = atoi(optarg);
