@@ -266,7 +266,7 @@ uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT; /**< Number of TX descriptors. */
 /*
  * Configurable value of processing number of cycles.
  */
-#define RTE_TEST_PROC_CYCLES_DEFAULT 1000
+#define RTE_TEST_PROC_CYCLES_DEFAULT 0
 uint64_t proc_cycles = RTE_TEST_PROC_CYCLES_DEFAULT;
 
 #define RTE_PMD_PARAM_UNSET -1

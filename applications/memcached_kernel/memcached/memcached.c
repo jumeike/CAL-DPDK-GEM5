@@ -187,7 +187,7 @@ size_t process_through_memcached(uint8_t* rx_buff_ptr, uint8_t* tx_buff_ptr) {
             memcpy(rsp_data, value, value_len);
         } else {
             rsp_hdr->status[0] = 0xff;  // Send failure.
-	    value_len=0; //Johnson
+	        value_len=0; //Johnson
         }
 
         return sizeof(struct MemcacheUdpHeader) + sizeof(struct RespHdr) + value_len;
