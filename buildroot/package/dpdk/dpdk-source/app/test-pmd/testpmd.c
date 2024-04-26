@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#include <gem5/m5ops.h>
 #include <rte_common.h>
 #include <rte_errno.h>
 #include <rte_byteorder.h>
@@ -266,7 +267,7 @@ uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT; /**< Number of TX descriptors. */
 /*
  * Configurable value of processing number of cycles.
  */
-#define RTE_TEST_PROC_CYCLES_DEFAULT 0
+#define RTE_TEST_PROC_CYCLES_DEFAULT 1000
 uint64_t proc_cycles = RTE_TEST_PROC_CYCLES_DEFAULT;
 
 #define RTE_PMD_PARAM_UNSET -1
@@ -3931,6 +3932,8 @@ main(int argc, char** argv)
 		}
 
 		printf("Press enter to exit\n");
+		printf("Taking post-initialization checkpoint . . .");
+		m5_checkpoint(0, 0);
 		rc = read(0, &c, 1);
 		pmd_test_exit();
 		if (rc < 0)

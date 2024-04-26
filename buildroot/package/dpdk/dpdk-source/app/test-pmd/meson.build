@@ -4,6 +4,7 @@
 # override default name to drop the hyphen
 name = 'testpmd'
 cflags += '-Wno-deprecated-declarations'
+ext_deps += [c.find_library('libm5', dirs : gem5dir)]
 sources = files('5tswap.c',
 	'cmdline.c',
 	'cmdline_flow.c',
