@@ -118,7 +118,7 @@ def config_cache(options, system):
     # Add L3 cache (for IDIO)
     if options.l3cache:
         if not options.l2cache:
-            fetal("L3 cache cannot exist without L2 cache")
+            fatal("L3 cache cannot exist without L2 cache")
 
         system.l3 = l2_cache_class(clk_domain = system.cpu_clk_domain,
                                     size = options.l3_size,
